@@ -1,0 +1,31 @@
+---
+import BaseHead from "@components/BaseHead.astro";
+import { SITE_DESCRIPTION, SITE_TITLE } from "../consts";
+import { defaultLocale, type Locale } from "@i18n/config";
+
+const {
+  title,
+  description,
+  lang = (Astro.currentLocale as unknown as Locale) ?? defaultLocale,
+  tag,
+} = Astro.props;
+---
+
+<html lang={lang}>
+  <head>
+    <BaseHead
+      title={title ? `${title} | ${SITE_TITLE}` : SITE_TITLE}
+      description={description ?? SITE_DESCRIPTION}
+    />
+    <slot name="inside-head" />
+  </head>
+
+  <body>
+    <slot />
+    <script
+      type="text/partytown"
+      src={import.meta.env.UMAMI_SCRIPT_URL}
+      data-website-id={import.meta.env.UMAMI_WEBSITE_ID}
+      data-tag={tag}></script>
+  </body>
+</html>

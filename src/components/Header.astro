@@ -1,0 +1,69 @@
+---
+import { getRelativeLocaleUrl } from "astro:i18n";
+import { SITE_TITLE } from "../consts";
+import { useTranslations } from "@i18n/utils";
+import HeaderLink from "./HeaderLink.astro";
+import LanguagePicker from "./LanguagePicker.astro";
+import { defaultLocale } from "@i18n/config";
+
+const locale = Astro.currentLocale ?? defaultLocale;
+const t = useTranslations(locale);
+---
+
+<header>
+  <nav>
+    <h2><a href={getRelativeLocaleUrl(locale)}>{SITE_TITLE}</a></h2>
+    <div class="internal-links">
+      <HeaderLink href={getRelativeLocaleUrl(locale)}
+        >{t("nav.home")}</HeaderLink
+      >
+      <HeaderLink href={getRelativeLocaleUrl(locale, "blog")}
+        >{t("nav.blog")}</HeaderLink
+      >
+      <HeaderLink href={getRelativeLocaleUrl(locale, "about")}
+        >{t("nav.about")}</HeaderLink
+      >
+    </div>
+    <div class="nav-actions">
+      <LanguagePicker />
+    </div>
+  </nav>
+</header>
+<style>
+  header {
+    margin: 0;
+    padding: 0 1em;
+    background: rgb(var(--header));
+    box-shadow: 0 2px 8px rgba(var(--black), 5%);
+  }
+  h2 {
+    margin: 0;
+    font-size: 1em;
+  }
+
+  h2 a,
+  h2 a.active {
+    text-decoration: none;
+  }
+  nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1em;
+  }
+  nav a {
+    padding: 1em 0.5em;
+    color: rgb(var(--text-color));
+    border-bottom: 4px solid transparent;
+    text-decoration: none;
+  }
+  nav a.active {
+    text-decoration: none;
+    border-bottom-color: rgb(var(--accent));
+  }
+  .nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 1em;
+  }
+</style>

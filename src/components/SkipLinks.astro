@@ -1,0 +1,54 @@
+---
+import { useTranslations } from "@i18n/utils";
+import { defaultLocale, type Locale } from "@i18n/config";
+
+interface Props {
+  to: string | { anchor: string; label: string }[];
+}
+
+const { to } = Astro.props;
+const t = useTranslations(
+  (Astro.currentLocale as unknown as Locale) ?? defaultLocale,
+);
+---
+
+<div class="skiplinks">
+  {
+    typeof to === "string" ? (
+      <a href={`#${to}`}> {t("skipLinks.toContent")} </a>
+    ) : (
+      to.map(({ anchor, label }) => (
+        <a href={`#${anchor}`}>
+          {t("skipLinks.beforeLabel", { label: label })}
+        </a>
+      ))
+    )
+  }
+</div>
+
+<style>
+  .skiplinks {
+    background-color: rgb(var(--neutral-light));
+    text-align: center;
+  }
+
+  .skiplinks a {
+    display: block;
+    font-weight: 600;
+    color: rgb(var(--accent));
+    text-decoration: underline;
+  }
+
+  .skiplinks a:not(:focus):not(:focus-within) {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+    padding: 0.5rem 0.5rem;
+  }
+</style>

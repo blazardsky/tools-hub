@@ -1,0 +1,45 @@
+---
+export const prerender = false;
+
+import { defaultLocale } from "@i18n/config";
+import Layout from "@layouts/LandingPage.astro";
+import type { MDXContent } from "astro";
+
+const { slug } = Astro.params;
+
+const modules = import.meta.glob<{
+  default: MDXContent;
+  frontmatter: Record<string, any>;
+}>("/src/abtests/*/*.mdx");
+
+const variants = Object.entries(modules)
+  .filter(([path]) => path.startsWith(`/src/abtests/${slug}/`))
+  .map(([path, importer]) => ({
+    name: (path.split("/").pop() ?? "").replace(".mdx", ""),
+    importer,
+  }));
+
+if (variants.length === 0) return Astro.redirect("/404");
+
+const cookieName = `ab_${slug}`;
+let variantName = Astro.cookies.get(cookieName)?.value;
+
+if (!variantName || !variants.some((v) => v.name === variantName)) {
+  variantName = variants[Math.floor(Math.random() * variants.length)].name;
+  Astro.cookies.set(cookieName, variantName, {
+    path: `/offers/${slug}`,
+    maxAge: 60 * 60 * 24 * 30,
+  });
+}
+
+const chosen = variants.find((v) => v.name === variantName);
+if (!chosen) return Astro.redirect("/404");
+
+const { default: Variant, frontmatter } = await chosen.importer();
+const tag = `${slug}-${variantName}`;
+const lang = frontmatter.lang ?? defaultLocale;
+---
+
+<Layout tag={tag} lang={lang}>
+  <Variant />
+</Layout>

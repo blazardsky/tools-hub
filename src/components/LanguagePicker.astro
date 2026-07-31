@@ -1,0 +1,68 @@
+---
+import { getRelativeLocaleUrlList } from "astro:i18n";
+import {
+  defaultLocale,
+  localeLabels,
+  locales,
+  type Locale,
+} from "@i18n/config";
+import { getRoutePath, useTranslations } from "@i18n/utils";
+
+const currentLocale =
+  (Astro.currentLocale as unknown as Locale) ?? defaultLocale;
+const t = useTranslations(currentLocale);
+const routePath = getRoutePath(Astro.url.pathname, currentLocale);
+const localeUrls = getRelativeLocaleUrlList(routePath);
+---
+
+<div
+  class="language-picker"
+  role="navigation"
+  aria-label={t("languagePicker.label")}
+>
+  {
+    locales.map((locale, index) => (
+      <>
+        {index > 0 && (
+          <span class="separator" aria-hidden="true">
+            |
+          </span>
+        )}
+        <a
+          href={localeUrls[index]}
+          lang={locale}
+          hreflang={locale}
+          class:list={{ active: locale === currentLocale }}
+          aria-current={locale === currentLocale ? "page" : undefined}
+        >
+          {localeLabels[locale]}
+        </a>
+      </>
+    ))
+  }
+</div>
+
+<style>
+  .language-picker {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    font-size: 0.875em;
+  }
+
+  .language-picker a {
+    color: rgb(var(--text-color));
+    text-decoration: none;
+    border-bottom: 2px solid transparent;
+    padding: 0.25em 0;
+  }
+
+  .language-picker a.active {
+    border-bottom-color: rgb(var(--accent));
+    font-weight: 600;
+  }
+
+  .separator {
+    color: rgb(var(--neutral));
+  }
+</style>

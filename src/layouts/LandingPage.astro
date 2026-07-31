@@ -1,0 +1,27 @@
+---
+import Layout from "./_layout.astro";
+import Footer from "@components/Footer.astro";
+import Logo from "@components/ui/Logo.astro";
+
+const { title, description, tag, lang } = Astro.props;
+---
+
+<Layout lang={lang} title={title} description={description} tag={tag}>
+  <meta name="robots" content="noindex, follow" slot="inside-head" />
+  <header>
+    <Logo linkHome={true} invert={true} size="xs" />
+  </header>
+  <slot />
+  <Footer />
+</Layout>
+
+<style>
+  header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 0.25rem 1em;
+    background: rgb(var(--header));
+    box-shadow: 0 2px 8px rgba(var(--black), 5%);
+  }
+</style>
