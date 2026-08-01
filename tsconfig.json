@@ -12,7 +12,11 @@
     "jsx": "react-jsx",
     "jsxImportSource": "react",
     "strictNullChecks": true,
+    "baseUrl": ".",
     "paths": {
+      "@/*": [
+        "./src/*"
+      ],
       "@components/*": [
         "./src/components/*"
       ],

@@ -3,13 +3,16 @@
 import react from '@astrojs/react';
 import sitemap from '@astrojs/sitemap';
 import cloudflare from '@astrojs/cloudflare';
-import partytown from '@astrojs/partytown';  
+import partytown from '@astrojs/partytown';
 
 import { defineConfig, fontProviders } from 'astro/config';
+
+import tailwindcss from '@tailwindcss/vite';
 
 // https://astro.build/config
 export default defineConfig({
   site: 'https://example.com',
+
   i18n: {
     locales: ['en', 'it'],
     defaultLocale: 'en',
@@ -20,6 +23,7 @@ export default defineConfig({
       prefixDefaultLocale: false
     },
   },
+
   integrations: [
     react(), sitemap(), partytown({
       config: {
@@ -27,7 +31,9 @@ export default defineConfig({
       },
     })
   ],
+
   output: 'server',
+
   fonts: [
       {
           provider: fontProviders.local(),
@@ -59,9 +65,13 @@ export default defineConfig({
             ],
           },
       },
-	],
+    ],
 
   adapter: cloudflare({
     imageService: 'compile',
   }),
+
+  vite: {
+    plugins: [tailwindcss()],
+  },
 });
