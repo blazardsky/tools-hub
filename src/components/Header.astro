@@ -1,17 +1,10 @@
 ---
 import { SITE_TITLE } from "../consts";
-import HeaderLink from "./HeaderLink.astro";
 ---
 
 <header>
   <nav>
     <h2><a href="/">{SITE_TITLE}</a></h2>
-    <div class="internal-links">
-      <HeaderLink href="/">Home</HeaderLink>
-      <HeaderLink href="/openbadge-verifier">OpenBadge Verifier</HeaderLink>
-      <HeaderLink href="/markdown-notes">Markdown Notes</HeaderLink>
-      <HeaderLink href="/recipe-converter">Recipe Converter</HeaderLink>
-    </div>
   </nav>
 </header>
 <style>
@@ -26,24 +19,16 @@ import HeaderLink from "./HeaderLink.astro";
     font-size: 1em;
   }
 
-  h2 a,
-  h2 a.active {
+  h2 a {
     text-decoration: none;
   }
   nav {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 1em;
   }
   nav a {
     padding: 1em 0.5em;
     color: rgb(var(--text-color));
-    border-bottom: 4px solid transparent;
     text-decoration: none;
-  }
-  nav a.active {
-    text-decoration: none;
-    border-bottom-color: rgb(var(--brand));
   }
 </style>
