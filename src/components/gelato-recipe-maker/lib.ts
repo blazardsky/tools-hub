@@ -10,6 +10,8 @@ import {
 	type RecipeKind,
 	SERVICE_TEMP,
 	type ServiceTempKey,
+	SUGAR_MODES,
+	type SugarMode,
 } from "./const";
 
 /** Scale a per-kg dose to an arbitrary mix weight. */
@@ -58,6 +60,7 @@ export type PacBalance = {
 	target: number;
 	fromSucrose: number;
 	fromDextrose: number;
+	fromHoney: number;
 	fromAlcohol: number;
 	total: number;
 	/** Target − sugar PAC (room reserved / available before counting alcohol). */
@@ -73,6 +76,7 @@ export function computePacBalance(opts: {
 	mixGrams: number;
 	sucrose: number;
 	dextrose: number;
+	honey?: number;
 	alcoholGrams?: number;
 	abvPercent?: number;
 }): PacBalance {
@@ -80,13 +84,12 @@ export function computePacBalance(opts: {
 	const mix = opts.mixGrams;
 	const fromSucrose = pacPoints(opts.sucrose, PAC_INDEX.sucrose, mix);
 	const fromDextrose = pacPoints(opts.dextrose, PAC_INDEX.dextrose, mix);
+	const fromHoney = pacPoints(opts.honey ?? 0, PAC_INDEX.honey, mix);
 	const abv = opts.abvPercent ?? 0;
 	const fromAlcohol = alcoholPacPoints(opts.alcoholGrams ?? 0, abv, mix);
-	const sugarPac = fromSucrose + fromDextrose;
+	const sugarPac = fromSucrose + fromDextrose + fromHoney;
 	const total = round(sugarPac + fromAlcohol, 1);
-	/** PAC still available after sugars (and before counting current alcohol). */
 	const sugarMargin = round(temp.pacTarget - sugarPac, 1);
-	/** PAC still available after sugars + current alcohol. */
 	const remaining = round(temp.pacTarget - total, 1);
 
 	return {
@@ -95,6 +98,7 @@ export function computePacBalance(opts: {
 		target: temp.pacTarget,
 		fromSucrose,
 		fromDextrose,
+		fromHoney,
 		fromAlcohol,
 		total,
 		margin: sugarMargin,
@@ -111,6 +115,8 @@ export type RecipeInput = {
 	totalGrams?: number;
 	/** Service temperature — scales sugars so mix PAC hits the target. */
 	tempKey?: ServiceTempKey;
+	/** Kitchen sugar / honey instead of the default sucrose+dextrose blend. */
+	sugarMode?: SugarMode;
 	/** Optional extras on top of the balanced base. */
 	alcoholGrams?: number;
 	/** ABV % of the liquor (needed to reserve PAC for alcohol). */
@@ -126,6 +132,7 @@ export type RecipeIngredients = {
 	milk: number;
 	sucrose: number;
 	dextrose: number;
+	honey: number;
 	/** Formula panna + optional extra. */
 	panna: number;
 	/** Formula water + optional extra. */
@@ -185,19 +192,20 @@ function resolveTargetTotal(input: RecipeInput): {
 }
 
 /**
- * Grams of sucrose+dextrose needed for `desiredPac` at this mix weight & ratio.
- * PAC = (sucrose×1 + dextrose×1.9) × 1000/mix → sugarTotal × (1.9 − 0.9×share) × 1000/mix
+ * Grams of sugars needed for `desiredPac` at this mix weight & sucrose share.
+ * High-PAC fraction (dextrose or honey) uses index 190.
+ * PAC = (sucrose×1 + highPac×1.9) × 1000/mix
  */
 function sugarsForPac(
 	desiredPac: number,
 	mixGrams: number,
 	sucroseShare: number,
-): { sucrose: number; dextrose: number } {
-	if (desiredPac <= 0 || mixGrams <= 0) return { sucrose: 0, dextrose: 0 };
+): { sucrose: number; highPac: number } {
+	if (desiredPac <= 0 || mixGrams <= 0) return { sucrose: 0, highPac: 0 };
 	const pacPerGramAt1kg = 1.9 - 0.9 * sucroseShare;
 	const sugarTotal = (desiredPac * mixGrams) / (1000 * pacPerGramAt1kg);
 	const sucrose = sugarTotal * sucroseShare;
-	return { sucrose, dextrose: sugarTotal - sucrose };
+	return { sucrose, highPac: sugarTotal - sucrose };
 }
 
 /**
@@ -208,35 +216,46 @@ function sugarsForPac(
 export function generateRecipe(input: RecipeInput): RecipeResult {
 	const params = KIND[input.kind];
 	const tempKey = input.tempKey ?? "professional";
+	const sugarMode = input.sugarMode ?? "blend";
+	const mode = SUGAR_MODES[sugarMode];
 	const pacTarget = SERVICE_TEMP[tempKey].pacTarget;
 	const { fruit, targetTotal } = resolveTargetTotal(input);
+
+	const sucroseShare = mode.sucroseOnly ? 1 : params.sucroseShare;
+	const sugarTotalFactor =
+		sugarMode === "common"
+			? params.liquid === "water"
+				? SUGAR_MODES.common.sorbetSugarFactor
+				: SUGAR_MODES.common.creamSugarFactor
+			: params.sugarTotalFactor;
 
 	const alcohol = Math.max(0, input.alcoholGrams ?? 0);
 	const abv = Math.max(0, input.alcoholAbv ?? 0);
 	const alcoholPac = alcoholPacPoints(alcohol, abv, targetTotal);
 	const desiredSugarPac = Math.max(0, pacTarget - alcoholPac);
 
-	// Formula sugars as a floor/baseline, then raise/lower to hit PAC target.
 	const baselineSugar = Math.max(
 		0,
-		targetTotal * params.sugarTotalFactor - fruit * params.fruitSugarFactor,
+		targetTotal * sugarTotalFactor - fruit * params.fruitSugarFactor,
 	);
-	const baselineSucrose = baselineSugar * params.sucroseShare;
-	const baselineDextrose = baselineSugar - baselineSucrose;
+	const baselineSucrose = baselineSugar * sucroseShare;
+	const baselineHighPac = baselineSugar - baselineSucrose;
+	const highPacIndex = mode.useHoney ? PAC_INDEX.honey : PAC_INDEX.dextrose;
 	const baselinePac =
 		pacPoints(baselineSucrose, PAC_INDEX.sucrose, targetTotal) +
-		pacPoints(baselineDextrose, PAC_INDEX.dextrose, targetTotal);
+		pacPoints(baselineHighPac, highPacIndex, targetTotal);
 
-	const { sucrose, dextrose } =
+	const scaled =
 		baselinePac > 0
-			? (() => {
-					const scale = desiredSugarPac / baselinePac;
-					return {
-						sucrose: baselineSucrose * scale,
-						dextrose: baselineDextrose * scale,
-					};
-				})()
-			: sugarsForPac(desiredSugarPac, targetTotal, params.sucroseShare);
+			? {
+					sucrose: baselineSucrose * (desiredSugarPac / baselinePac),
+					highPac: baselineHighPac * (desiredSugarPac / baselinePac),
+				}
+			: sugarsForPac(desiredSugarPac, targetTotal, sucroseShare);
+
+	const sucrose = scaled.sucrose;
+	const dextrose = mode.useHoney || mode.sucroseOnly ? 0 : scaled.highPac;
+	const honey = mode.useHoney ? scaled.highPac : 0;
 
 	const formulaPanna = targetTotal * params.pannaFactor;
 	const lemonJuice = targetTotal * params.lemonPerKg;
@@ -247,7 +266,15 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 	const salt = targetTotal * 0.0005; // 0.5 g/kg
 
 	const fixed =
-		fruit + sucrose + dextrose + formulaPanna + lemonJuice + xanthan + salt;
+		fruit +
+		sucrose +
+		dextrose +
+		honey +
+		formulaPanna +
+		lemonJuice +
+		xanthan +
+		salt +
+		alcohol;
 	const residual = Math.max(0, targetTotal - fixed);
 	const milk = params.liquid === "milk" ? residual : 0;
 	const formulaWater = params.liquid === "water" ? residual : 0;
@@ -260,6 +287,7 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		milk: round(milk),
 		sucrose: round(sucrose),
 		dextrose: round(dextrose),
+		honey: round(honey),
 		panna: round(formulaPanna + extraPanna),
 		water: round(formulaWater + extraWater),
 		lemonJuice: round(lemonJuice),
@@ -295,6 +323,7 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		mixGrams: actualTotal,
 		sucrose: ingredients.sucrose,
 		dextrose: ingredients.dextrose,
+		honey: ingredients.honey,
 		alcoholGrams: ingredients.alcohol,
 		abvPercent: abv,
 	});

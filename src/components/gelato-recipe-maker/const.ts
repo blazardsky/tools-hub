@@ -69,6 +69,8 @@ export const PAC_INDEX = {
 	sucrose: 100,
 	dextrose: 190,
 	invertedSugar: 190,
+	/** Honey ≈ invert sugar (glucose + fructose). */
+	honey: 190,
 	/** Atomized glucose 21 DE — solids without PAC. */
 	glucoseAtomized21DE: 0,
 	lactose: 100,
@@ -78,8 +80,39 @@ export const PAC_INDEX = {
 export const POD_INDEX = {
 	sucrose: 100,
 	dextrose: 70,
+	/** Honey is sweeter than sucrose — approximate. */
+	honey: 130,
 	lactose: 16,
 } as const;
+
+/**
+ * Kitchen-sugar / honey modes when dextrose isn't available.
+ * Default blend keeps KIND.sucroseShare (80/20 creams, 70/30 sorbet).
+ */
+export const SUGAR_MODES = {
+	blend: {
+		label: "Sucrose + dextrose",
+		sucroseOnly: false,
+		useHoney: false,
+	},
+	common: {
+		label: "Common sugar (sucrose only)",
+		sucroseOnly: true,
+		useHoney: false,
+		/** Creams 17–18%; sorbets 22–24% when no technical sugars. */
+		creamSugarFactor: 0.175,
+		sorbetSugarFactor: 0.23,
+		note: "Hardens or turns sandy in the freezer — eat soon. Dissolve fully in warm milk. A splash of alcohol helps PAC.",
+	},
+	honey: {
+		label: "Honey (replaces dextrose)",
+		sucroseOnly: false,
+		useHoney: true,
+		note: "PAC 190 like invert sugar — keeps the scoop soft. Prefer acacia for a milder flavour.",
+	},
+} as const;
+
+export type SugarMode = keyof typeof SUGAR_MODES;
 
 /**
  * Pure alcohol grams × this = PAC points (per kg mix convention).
@@ -165,35 +198,39 @@ export const KIND: Record<RecipeKind, KindParams> = {
 	},
 };
 
-export const KIND_OPTIONS: { value: RecipeKind; label: string; hint: string }[] =
-	[
-		{
-			value: "fruit_acid",
-			label: "Acid fruit (pH < 5)",
-			hint: "Plums, strawberries, berries — fruit in churn when mix is cold",
-		},
-		{
-			value: "fruit_sweet",
-			label: "Sweet fruit (pH > 5)",
-			hint: "Banana, mango, figs — blend fruit with base before churning",
-		},
-		{
-			value: "cream",
-			label: "Base bianca (cream)",
-			hint: "No fruit — set desired mix weight",
-		},
-		{
-			value: "sorbet",
-			label: "Sorbet",
-			hint: "Fruit + water base, higher sugars",
-		},
-	];
+export const KIND_OPTIONS: {
+	value: RecipeKind;
+	label: string;
+	hint: string;
+}[] = [
+	{
+		value: "fruit_acid",
+		label: "Acid fruit (pH < 5)",
+		hint: "Plums, strawberries, berries — fruit in churn when mix is cold",
+	},
+	{
+		value: "fruit_sweet",
+		label: "Sweet fruit (pH > 5)",
+		hint: "Banana, mango, figs — blend fruit with base before churning",
+	},
+	{
+		value: "cream",
+		label: "Base bianca (cream)",
+		hint: "No fruit — set desired mix weight",
+	},
+	{
+		value: "sorbet",
+		label: "Sorbet",
+		hint: "Fruit + water base, higher sugars",
+	},
+];
 
 export const INGREDIENT_ROWS = [
 	{ key: "fruit", label: "Fruit" },
 	{ key: "milk", label: "Milk" },
 	{ key: "sucrose", label: "Sucrose" },
 	{ key: "dextrose", label: "Dextrose" },
+	{ key: "honey", label: "Honey" },
 	{ key: "panna", label: "Panna (35%)" },
 	{ key: "water", label: "Water" },
 	{ key: "lemonJuice", label: "Lemon juice" },
@@ -272,4 +309,5 @@ export const FLAVOR_ROWS: {
 export const fieldClass =
 	"mt-1 w-full border border-[rgb(var(--page-border))] bg-[rgb(var(--header))] px-3 py-2 text-base text-[rgb(var(--text-color))] outline-none focus-visible:border-[rgb(var(--brand))] focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand)/0.25)]";
 
-export const labelClass = "block text-sm font-medium text-[rgb(var(--text-title))]";
+export const labelClass =
+	"block text-sm font-medium text-[rgb(var(--text-title))]";

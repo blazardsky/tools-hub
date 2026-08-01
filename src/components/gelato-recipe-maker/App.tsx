@@ -4,18 +4,20 @@ import { cn } from "@/lib/utils";
 import {
 	ALCOHOL_MIX_TWEAKS,
 	BASE_BIANCA_FLAVORS,
-	fieldClass,
 	FLAVOR_ROWS,
 	FRUIT_TO_TOTAL,
+	fieldClass,
 	INGREDIENT_ROWS,
 	KIND_OPTIONS,
-	labelClass,
 	LACTOSE_FREE,
+	labelClass,
 	PAC_INDEX,
 	POD_INDEX,
 	type RecipeKind,
 	SERVICE_TEMP,
 	type ServiceTempKey,
+	SUGAR_MODES,
+	type SugarMode,
 	TARGETS,
 } from "./const";
 import { doseFor, generateRecipe, type RecipeResult } from "./lib";
@@ -99,6 +101,7 @@ export default function App() {
 	const [fruitGrams, setFruitGrams] = useState("500");
 	const [totalGrams, setTotalGrams] = useState("1000");
 	const [tempKey, setTempKey] = useState<ServiceTempKey>("professional");
+	const [sugarMode, setSugarMode] = useState<SugarMode>("blend");
 	const [addAlcohol, setAddAlcohol] = useState(false);
 	const [alcoholGrams, setAlcoholGrams] = useState("");
 	const [alcoholAbv, setAlcoholAbv] = useState("40");
@@ -115,15 +118,14 @@ export default function App() {
 		const total = parseGrams(totalGrams);
 		if (isCream ? total <= 0 : fruit <= 0) return null;
 		const abv = Number(alcoholAbv);
-		const alcoholG = addAlcohol ? parseGrams(alcoholGrams) : 0;
 		try {
 			return generateRecipe({
 				kind,
 				fruitGrams: isCream ? undefined : fruit,
 				totalGrams: isCream ? total : undefined,
 				tempKey,
-				planAlcohol: addAlcohol && alcoholG <= 0,
-				alcoholGrams: alcoholG,
+				sugarMode,
+				alcoholGrams: addAlcohol ? parseGrams(alcoholGrams) : 0,
 				alcoholAbv: addAlcohol && Number.isFinite(abv) && abv > 0 ? abv : 0,
 				extraPannaGrams: addPanna ? parseGrams(extraPannaGrams) : 0,
 				extraWaterGrams: addWater ? parseGrams(extraWaterGrams) : 0,
@@ -137,6 +139,7 @@ export default function App() {
 		fruitGrams,
 		totalGrams,
 		tempKey,
+		sugarMode,
 		addAlcohol,
 		alcoholGrams,
 		alcoholAbv,
@@ -157,6 +160,7 @@ export default function App() {
 		setFruitGrams("500");
 		setTotalGrams("1000");
 		setTempKey("professional");
+		setSugarMode("blend");
 		setAddAlcohol(false);
 		setAlcoholGrams("");
 		setAlcoholAbv("40");
@@ -276,11 +280,24 @@ export default function App() {
 							<span className="tabular-nums text-[rgb(var(--text-title))]">
 								{result.ingredients.sucrose} g
 							</span>
-							{" · "}
-							dextrose{" "}
-							<span className="tabular-nums text-[rgb(var(--text-title))]">
-								{result.ingredients.dextrose} g
-							</span>
+							{result.ingredients.dextrose > 0 ? (
+								<>
+									{" · "}
+									dextrose{" "}
+									<span className="tabular-nums text-[rgb(var(--text-title))]">
+										{result.ingredients.dextrose} g
+									</span>
+								</>
+							) : null}
+							{result.ingredients.honey > 0 ? (
+								<>
+									{" · "}
+									honey{" "}
+									<span className="tabular-nums text-[rgb(var(--text-title))]">
+										{result.ingredients.honey} g
+									</span>
+								</>
+							) : null}
 							{" · "}
 							total PAC{" "}
 							<span className="tabular-nums text-[rgb(var(--text-title))]">
@@ -296,6 +313,52 @@ export default function App() {
 							milk/water) so the mix scoops at that freezer setting.
 						</p>
 					)}
+				</fieldset>
+
+				<fieldset className="space-y-3">
+					<legend className={labelClass}>Sugar options</legend>
+					<p className="text-sm text-[rgb(var(--text-muted))]">
+						Default uses sucrose + dextrose. Pick one alternative if you only
+						have kitchen sugar or honey.
+					</p>
+					<div className="space-y-2">
+						<label className="flex items-start gap-2 text-sm">
+							<input
+								type="checkbox"
+								className="mt-1"
+								checked={sugarMode === "common"}
+								onChange={(e) =>
+									setSugarMode(e.target.checked ? "common" : "blend")
+								}
+							/>
+							<span>
+								<span className="font-medium text-[rgb(var(--text-title))]">
+									Common sugar only
+								</span>
+								<span className="mt-0.5 block text-[rgb(var(--text-muted))]">
+									{SUGAR_MODES.common.note}
+								</span>
+							</span>
+						</label>
+						<label className="flex items-start gap-2 text-sm">
+							<input
+								type="checkbox"
+								className="mt-1"
+								checked={sugarMode === "honey"}
+								onChange={(e) =>
+									setSugarMode(e.target.checked ? "honey" : "blend")
+								}
+							/>
+							<span>
+								<span className="font-medium text-[rgb(var(--text-title))]">
+									Honey
+								</span>
+								<span className="mt-0.5 block text-[rgb(var(--text-muted))]">
+									{SUGAR_MODES.honey.note}
+								</span>
+							</span>
+						</label>
+					</div>
 				</fieldset>
 
 				<fieldset className="space-y-4">
@@ -445,8 +508,11 @@ export default function App() {
 								<ul className="space-y-1 text-sm tabular-nums">
 									<li>Target: {pac.target}</li>
 									<li>
-										Sugars: {pac.fromSucrose} (sucrose) + {pac.fromDextrose}{" "}
-										(dextrose)
+										Sugars: {pac.fromSucrose} (sucrose)
+										{pac.fromDextrose > 0
+											? ` + ${pac.fromDextrose} (dextrose)`
+											: ""}
+										{pac.fromHoney > 0 ? ` + ${pac.fromHoney} (honey)` : ""}
 									</li>
 									<li>Alcohol: {pac.fromAlcohol}</li>
 									<li>
@@ -471,12 +537,12 @@ export default function App() {
 								</ul>
 								<p className="text-sm text-[rgb(var(--text-muted))]">
 									Indexes — PAC sucrose {PAC_INDEX.sucrose} / dextrose{" "}
-									{PAC_INDEX.dextrose} / invert {PAC_INDEX.invertedSugar} /
-									glucose 21 DE {PAC_INDEX.glucoseAtomized21DE}. POD sucrose{" "}
-									{POD_INDEX.sucrose} / dextrose {POD_INDEX.dextrose} / lactose{" "}
-									{POD_INDEX.lactose}. Lactose-free milk raises PAC & POD — cut
-									sugars ~{LACTOSE_FREE.sugarCutFraction * 100}% if soft or too
-									sweet.
+									{PAC_INDEX.dextrose} / honey {PAC_INDEX.honey} / invert{" "}
+									{PAC_INDEX.invertedSugar}. POD sucrose {POD_INDEX.sucrose} /
+									dextrose {POD_INDEX.dextrose} / honey {POD_INDEX.honey} /
+									lactose {POD_INDEX.lactose}. Lactose-free milk raises PAC &
+									POD — cut sugars ~{LACTOSE_FREE.sugarCutFraction * 100}% if
+									soft or too sweet.
 								</p>
 							</div>
 						) : null}
