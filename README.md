@@ -2,36 +2,26 @@
 version: v0.1
 ---
 
-# ASTRO Marketing Website Template
+# Tools HUB
 
-_Features:_
+A collection of client-side tools for various uses. I made it for things i needed. Maybe you need it too?
 
-- mdx
-- partytown
-- rss
-- seo
-- i18n
-- a/b testing
-- cloudflare
-- umami analytics
-- sitemap
-- custom font
+## Tools list
 
-Structure:
+### Open Badge 3.0 Verifier
 
-- pages (/)
-- blog posts (/blog)
-- landing pages (/offers)
+| Status           | URL                                                                 | Description                                                                   | Why                                                                 |
+| ---------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Work in progress | [openbadge-verifier](https://tools.nicc-olo.com/openbadge-verifier) | A simple interface to validate Open Badges according to the new 3.0 standard. | Most tools use older 2.0 standard or are not implemented correctly. |
 
-## How to use automatic a/b testing
+### Markdown Notes
 
-1. Create a folder inside `src/abtests`: it will be the landing page slug.
-2. Add as many test pages as you want: for example `a.astro` and `b.astro` (page name is irrelevant)
-3. Done
+| Status          | URL                                                         | Description                                                   | Why                                                                                                                    |
+| --------------- | ----------------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Not yet started | [markdown-notes](https://tools.nicc-olo.com/markdown-notes) | A minimal interface to write some notes and save as markdwon. | I keep opening web pages searching for somewhere to write quickly a note or an idea or just to save a link temporarily |
 
-Landing pages are not localized as each landing page will probably differ to better align with the specific culture
+### Recipe Converter
 
-**How to rename the "offers" folder**
-
-1. rename the folder `offers/`
-2. inside `offers/[slug].astro` rename ``path: `/offers/${slug}`,``
+| Status          | URL                                                             | Description                                                            | Why                     |
+| --------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------- |
+| Not yet started | [recipe-converter](https://tools.nicc-olo.com/recipe-converter) | A form to quickly convert a recipe for n people into one for m people. | Requested from a friend |

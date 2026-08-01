@@ -3,7 +3,6 @@ import { getAbsoluteLocaleUrlList } from "astro:i18n";
 import "@styles/global.css";
 import type { ImageMetadata } from "astro";
 import FallbackImage from "@assets/fallback.jpg";
-import { SITE_TITLE } from "../consts";
 import { defaultLocale, locales, type Locale } from "@i18n/config";
 import { getRoutePath } from "@i18n/utils";
 import { Font } from "astro:assets";
@@ -30,12 +29,6 @@ const { title, description, image = FallbackImage } = Astro.props;
 <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 <link rel="icon" href="/favicon.ico" />
 <link rel="sitemap" href="/sitemap-index.xml" />
-<link
-  rel="alternate"
-  type="application/rss+xml"
-  title={SITE_TITLE}
-  href={new URL("rss.xml", Astro.site)}
-/>
 {
   locales.map((locale, index) => (
     <link rel="alternate" hreflang={locale} href={alternateLocaleUrls[index]} />

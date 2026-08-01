@@ -17,11 +17,14 @@ const t = useTranslations(locale);
       <HeaderLink href={getRelativeLocaleUrl(locale)}
         >{t("nav.home")}</HeaderLink
       >
-      <HeaderLink href={getRelativeLocaleUrl(locale, "blog")}
-        >{t("nav.blog")}</HeaderLink
+      <HeaderLink href={getRelativeLocaleUrl(locale, "openbadge-verifier")}
+        >{t("nav.openbadgeVerifier")}</HeaderLink
       >
-      <HeaderLink href={getRelativeLocaleUrl(locale, "about")}
-        >{t("nav.about")}</HeaderLink
+      <HeaderLink href={getRelativeLocaleUrl(locale, "markdown-notes")}
+        >{t("nav.markdownNotes")}</HeaderLink
+      >
+      <HeaderLink href={getRelativeLocaleUrl(locale, "recipe-converter")}
+        >{t("nav.recipeConverter")}</HeaderLink
       >
     </div>
     <div class="nav-actions">

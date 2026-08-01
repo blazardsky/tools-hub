@@ -1,5 +1,42 @@
 ---
-import HomePage from "@components/pages/HomePage.astro";
+import { getRelativeLocaleUrl } from "astro:i18n";
+import ToolLayout from "@layouts/ToolLayout.astro";
+import { useTranslations } from "@i18n/utils";
+import { defaultLocale } from "@i18n/config";
+
+const locale = Astro.currentLocale ?? defaultLocale;
+const t = useTranslations(locale);
+
+const tools = [
+  {
+    href: getRelativeLocaleUrl(locale, "openbadge-verifier"),
+    name: t("nav.openbadgeVerifier"),
+    description: t("home.openbadgeVerifier.description"),
+  },
+  {
+    href: getRelativeLocaleUrl(locale, "markdown-notes"),
+    name: t("nav.markdownNotes"),
+    description: t("home.markdownNotes.description"),
+  },
+  {
+    href: getRelativeLocaleUrl(locale, "recipe-converter"),
+    name: t("nav.recipeConverter"),
+    description: t("home.recipeConverter.description"),
+  },
+] as const;
 ---
 
-<HomePage />
+<ToolLayout title={t("home.title")} description={t("home.welcome")}>
+  <h1>{t("home.title")}</h1>
+  <p>{t("home.welcome")}</p>
+  <ul>
+    {
+      tools.map((tool) => (
+        <li>
+          <a href={tool.href}>{tool.name}</a>
+          <p>{tool.description}</p>
+        </li>
+      ))
+    }
+  </ul>
+</ToolLayout>

@@ -1,6 +1,6 @@
 // @ts-check
 
-import mdx from '@astrojs/mdx';
+import react from '@astrojs/react';
 import sitemap from '@astrojs/sitemap';
 import cloudflare from '@astrojs/cloudflare';
 import partytown from '@astrojs/partytown';  
@@ -21,7 +21,7 @@ export default defineConfig({
     },
   },
   integrations: [
-    mdx(), sitemap(), partytown({
+    react(), sitemap(), partytown({
       config: {
         forward: ['umami.track'],
       },
