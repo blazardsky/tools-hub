@@ -13,17 +13,6 @@ import tailwindcss from '@tailwindcss/vite';
 export default defineConfig({
   site: 'https://example.com',
 
-  i18n: {
-    locales: ['en', 'it'],
-    defaultLocale: 'en',
-    fallback: {
-      it: 'en',
-    },
-    routing: {
-      prefixDefaultLocale: false
-    },
-  },
-
   integrations: [
     react(), sitemap(), partytown({
       config: {

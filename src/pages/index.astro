@@ -1,34 +1,31 @@
 ---
-import { getRelativeLocaleUrl } from "astro:i18n";
 import ToolLayout from "@layouts/ToolLayout.astro";
-import { useTranslations } from "@i18n/utils";
-import { defaultLocale } from "@i18n/config";
-
-const locale = Astro.currentLocale ?? defaultLocale;
-const t = useTranslations(locale);
 
 const tools = [
   {
-    href: getRelativeLocaleUrl(locale, "openbadge-verifier"),
-    name: t("nav.openbadgeVerifier"),
-    description: t("home.openbadgeVerifier.description"),
+    href: "/openbadge-verifier",
+    name: "OpenBadge Verifier",
+    description: "Verify Open Badges locally in your browser.",
   },
   {
-    href: getRelativeLocaleUrl(locale, "markdown-notes"),
-    name: t("nav.markdownNotes"),
-    description: t("home.markdownNotes.description"),
+    href: "/markdown-notes",
+    name: "Markdown Notes",
+    description: "Take and preview markdown notes.",
   },
   {
-    href: getRelativeLocaleUrl(locale, "recipe-converter"),
-    name: t("nav.recipeConverter"),
-    description: t("home.recipeConverter.description"),
+    href: "/recipe-converter",
+    name: "Recipe Converter",
+    description: "Convert recipe quantities and units.",
   },
 ] as const;
 ---
 
-<ToolLayout title={t("home.title")} description={t("home.welcome")}>
-  <h1>{t("home.title")}</h1>
-  <p>{t("home.welcome")}</p>
+<ToolLayout
+  title="Tools Hub"
+  description="Small client-side tools. Pick one to get started."
+>
+  <h1>Tools Hub</h1>
+  <p>Small client-side tools. Pick one to get started.</p>
   <ul>
     {
       tools.map((tool) => (

@@ -1,11 +1,4 @@
 ---
-import { useTranslations } from "@i18n/utils";
-import { defaultLocale, type Locale } from "@i18n/config";
-
-const t = useTranslations(
-  (Astro.currentLocale as unknown as Locale) ?? defaultLocale,
-);
-
 type Props = {
   linkHome?: boolean;
   invert?: boolean;
@@ -15,7 +8,7 @@ type Props = {
 const { linkHome, invert, size = "md" }: Props = Astro.props;
 
 const Tag = linkHome ? "a" : "span";
-const linkAttrs = linkHome ? { href: "/", ariaLabel: t("nav.home") } : {};
+const linkAttrs = linkHome ? { href: "/", ariaLabel: "Home" } : {};
 const logoSizes = {
   xs: "1.5rem",
   sm: "2rem",

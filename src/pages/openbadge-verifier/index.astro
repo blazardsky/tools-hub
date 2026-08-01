@@ -1,15 +1,14 @@
 ---
 import ToolLayout from "@layouts/ToolLayout.astro";
 import App from "@components/openbadge-verifier/App";
-import { useTranslations } from "@i18n/utils";
-import { defaultLocale } from "@i18n/config";
 
-const locale = Astro.currentLocale ?? defaultLocale;
-const t = useTranslations(locale);
-const title = t("nav.openbadgeVerifier");
+const title = "OpenBadge Verifier";
 ---
 
-<ToolLayout title={title} description={t("home.openbadgeVerifier.description")}>
+<ToolLayout
+  title={title}
+  description="Verify Open Badges locally in your browser."
+>
   <h1>{title}</h1>
-  <App client:load label={t("tool.comingSoon")} />
+  <App client:load label="Coming soon" />
 </ToolLayout>

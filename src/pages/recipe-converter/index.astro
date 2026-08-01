@@ -1,15 +1,14 @@
 ---
 import ToolLayout from "@layouts/ToolLayout.astro";
 import App from "@components/recipe-converter/App";
-import { useTranslations } from "@i18n/utils";
-import { defaultLocale } from "@i18n/config";
 
-const locale = Astro.currentLocale ?? defaultLocale;
-const t = useTranslations(locale);
-const title = t("nav.recipeConverter");
+const title = "Recipe Converter";
 ---
 
-<ToolLayout title={title} description={t("home.recipeConverter.description")}>
+<ToolLayout
+  title={title}
+  description="Convert recipe quantities and units."
+>
   <h1>{title}</h1>
-  <App client:load label={t("tool.comingSoon")} />
+  <App client:load label="Coming soon" />
 </ToolLayout>

@@ -1,14 +1,11 @@
 ---
-import { useTranslations } from "../i18n/utils";
-
 const today = new Date();
-const t = useTranslations(Astro.currentLocale ?? "en");
 ---
 
 <footer>
   &copy; {today.getFullYear()}
   {" "}
-  {t("footer.rights")}
+  Your name here. All rights reserved.
   <div class="social-links">
     <a href="https://m.webtoo.ls/@astro" target="_blank">
       <span class="sr-only">Follow Astro on Mastodon</span>

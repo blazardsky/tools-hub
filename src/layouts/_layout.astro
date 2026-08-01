@@ -1,12 +1,11 @@
 ---
 import BaseHead from "@components/BaseHead.astro";
 import { SITE_DESCRIPTION, SITE_TITLE } from "../consts";
-import { defaultLocale, type Locale } from "@i18n/config";
 
 const {
   title,
   description,
-  lang = (Astro.currentLocale as unknown as Locale) ?? defaultLocale,
+  lang = "en",
   tag,
 } = Astro.props;
 ---

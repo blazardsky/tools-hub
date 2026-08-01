@@ -1,34 +1,16 @@
 ---
-import { getRelativeLocaleUrl } from "astro:i18n";
 import { SITE_TITLE } from "../consts";
-import { useTranslations } from "@i18n/utils";
 import HeaderLink from "./HeaderLink.astro";
-import LanguagePicker from "./LanguagePicker.astro";
-import { defaultLocale } from "@i18n/config";
-
-const locale = Astro.currentLocale ?? defaultLocale;
-const t = useTranslations(locale);
 ---
 
 <header>
   <nav>
-    <h2><a href={getRelativeLocaleUrl(locale)}>{SITE_TITLE}</a></h2>
+    <h2><a href="/">{SITE_TITLE}</a></h2>
     <div class="internal-links">
-      <HeaderLink href={getRelativeLocaleUrl(locale)}
-        >{t("nav.home")}</HeaderLink
-      >
-      <HeaderLink href={getRelativeLocaleUrl(locale, "openbadge-verifier")}
-        >{t("nav.openbadgeVerifier")}</HeaderLink
-      >
-      <HeaderLink href={getRelativeLocaleUrl(locale, "markdown-notes")}
-        >{t("nav.markdownNotes")}</HeaderLink
-      >
-      <HeaderLink href={getRelativeLocaleUrl(locale, "recipe-converter")}
-        >{t("nav.recipeConverter")}</HeaderLink
-      >
-    </div>
-    <div class="nav-actions">
-      <LanguagePicker />
+      <HeaderLink href="/">Home</HeaderLink>
+      <HeaderLink href="/openbadge-verifier">OpenBadge Verifier</HeaderLink>
+      <HeaderLink href="/markdown-notes">Markdown Notes</HeaderLink>
+      <HeaderLink href="/recipe-converter">Recipe Converter</HeaderLink>
     </div>
   </nav>
 </header>
@@ -63,10 +45,5 @@ const t = useTranslations(locale);
   nav a.active {
     text-decoration: none;
     border-bottom-color: rgb(var(--brand));
-  }
-  .nav-actions {
-    display: flex;
-    align-items: center;
-    gap: 1em;
   }
 </style>
