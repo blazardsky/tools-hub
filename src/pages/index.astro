@@ -1,4 +1,8 @@
 ---
+import CookingPot from "@phosphor-icons/core/duotone/cooking-pot-duotone.svg";
+import IceCream from "@phosphor-icons/core/duotone/ice-cream-duotone.svg";
+import NotePencil from "@phosphor-icons/core/duotone/note-pencil-duotone.svg";
+import SealCheck from "@phosphor-icons/core/duotone/seal-check-duotone.svg";
 import ToolLayout from "@layouts/ToolLayout.astro";
 
 const tools = [
@@ -6,21 +10,25 @@ const tools = [
     href: "/openbadge-verifier",
     name: "OpenBadge Verifier",
     description: "Verify Open Badges locally in your browser.",
+    Icon: SealCheck,
   },
   {
     href: "/markdown-notes",
     name: "Markdown Notes",
     description: "Take and preview markdown notes.",
+    Icon: NotePencil,
   },
   {
     href: "/recipe-converter",
     name: "Recipe Converter",
     description: "Convert recipe quantities and units.",
+    Icon: CookingPot,
   },
   {
     href: "/gelato-recipe-maker",
     name: "Gelato Recipe Maker",
     description: "Generate balanced gelato and sorbet quantities in grams.",
+    Icon: IceCream,
   },
 ] as const;
 ---
@@ -30,15 +38,47 @@ const tools = [
   description="Small client-side tools. Pick one to get started."
 >
   <h1>Tools Hub</h1>
-  <p>Small client-side tools. Pick one to get started.</p>
-  <ul>
+  <p class="text-muted-foreground">
+    Small client-side tools. Pick one to get started.
+  </p>
+  <ul class="tool-list">
     {
-      tools.map((tool) => (
+      tools.map(({ href, name, description, Icon }) => (
         <li>
-          <a href={tool.href}>{tool.name}</a>
-          <p>{tool.description}</p>
+          <a href={href}>
+            <Icon width={28} height={28} aria-hidden="true" />
+            <span>{name}</span>
+          </a>
+          <p class="text-muted-foreground">{description}</p>
         </li>
       ))
     }
   </ul>
 </ToolLayout>
+
+<style>
+  .tool-list {
+    list-style: none;
+    padding: 0;
+    margin: 2em 0 0;
+    display: grid;
+    gap: 1.25em;
+  }
+  .tool-list li {
+    margin: 0;
+  }
+  .tool-list a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6em;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .tool-list a:hover {
+    text-decoration: underline;
+  }
+  .tool-list p {
+    margin: 0.25em 0 0 2.4em;
+    font-size: 0.95em;
+  }
+</style>

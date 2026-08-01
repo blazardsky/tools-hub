@@ -5,8 +5,8 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
-  Site tokens (RGB channels for rgb()/rgba()).
-  Kept separate from shadcn theme tokens below (--background, --accent, etc.).
+  Legacy RGB tokens used by some tools (e.g. gelato-recipe-maker).
+  Site chrome uses shadcn theme tokens below.
  */
 :root {
 	--brand: 255, 90, 35;
@@ -157,17 +157,14 @@
 	}
 }
 
-/* Existing site layout styles (Bear Blog–based) */
+/* Site layout */
 body {
 	font-family: var(--font);
 	margin: 0;
 	padding: 0;
 	text-align: left;
-	background: rgb(var(--page-bg));
-	background-size: 100% 600px;
 	word-wrap: break-word;
 	overflow-wrap: break-word;
-	color: rgb(var(--text-color));
 	font-size: 20px;
 	line-height: 1.7;
 }
@@ -184,7 +181,7 @@ h4,
 h5,
 h6 {
 	margin: 0 0 0.5rem 0;
-	color: rgb(var(--text-title));
+	color: var(--foreground);
 	line-height: 1.2;
 }
 h1 {
@@ -207,10 +204,10 @@ b {
 	font-weight: 700;
 }
 a {
-	color: rgb(var(--brand));
+	color: var(--primary);
 }
 a:hover {
-	color: rgb(var(--brand-hover));
+	color: color-mix(in oklch, var(--primary) 80%, var(--foreground));
 }
 p {
 	margin-bottom: 1em;
@@ -234,29 +231,31 @@ table {
 img {
 	max-width: 100%;
 	height: auto;
-	border-radius: 8px;
+	border-radius: var(--radius-lg);
 }
 code {
 	padding: 2px 5px;
-	background-color: rgb(var(--neutral-light));
-	border-radius: 2px;
+	background-color: var(--muted);
+	border-radius: var(--radius-sm);
 }
 pre {
 	padding: 1.5em;
-	border-radius: 8px;
+	border-radius: var(--radius-lg);
+	background-color: var(--muted);
 }
 pre > code {
 	all: unset;
 }
 blockquote {
-	border-left: 4px solid rgb(var(--brand));
+	border-left: 4px solid var(--primary);
 	padding: 0 0 0 20px;
 	margin: 0;
 	font-size: 1.333em;
+	color: var(--muted-foreground);
 }
 hr {
 	border: none;
-	border-top: 1px solid rgb(var(--page-border));
+	border-top: 1px solid var(--border);
 }
 @media (max-width: 720px) {
 	body {

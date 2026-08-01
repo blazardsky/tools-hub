@@ -1,18 +1,24 @@
 ---
+import House from "@phosphor-icons/core/duotone/house-duotone.svg";
 import { SITE_TITLE } from "../consts";
 ---
 
 <header>
   <nav>
-    <h2><a href="/">{SITE_TITLE}</a></h2>
+    <h2>
+      <a href="/">
+        <House width={20} height={20} aria-hidden="true" />
+        {SITE_TITLE}
+      </a>
+    </h2>
   </nav>
 </header>
 <style>
   header {
     margin: 0;
     padding: 0 1em;
-    background: rgb(var(--header));
-    box-shadow: 0 2px 8px rgba(var(--black), 5%);
+    background: var(--background);
+    border-bottom: 1px solid var(--border);
   }
   h2 {
     margin: 0;
@@ -20,7 +26,15 @@ import { SITE_TITLE } from "../consts";
   }
 
   h2 a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
     text-decoration: none;
+    color: var(--foreground);
+  }
+  h2 a:hover {
+    color: var(--foreground);
+    opacity: 0.8;
   }
   nav {
     display: flex;
@@ -28,7 +42,6 @@ import { SITE_TITLE } from "../consts";
   }
   nav a {
     padding: 1em 0.5em;
-    color: rgb(var(--text-color));
     text-decoration: none;
   }
 </style>
