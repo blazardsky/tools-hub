@@ -1,56 +1,107 @@
 /** Gelato balancing formulas. All weights in grams. */
 
-export const FRUIT_TO_TOTAL = 2.2;
-
-/** Target ranges (informational). */
-export const TARGETS = {
-	fruitPercent: { min: 35, max: 50 },
-	sugarsCream: { min: 18, max: 22 },
-	sugarsSorbet: { min: 25, max: 30 },
-	fatsCream: { min: 4, max: 6 },
-	xanthanMaxPercent: 0.2,
-} as const;
-
-/**
- * Alert thresholds for optional additives (% of final mix).
- * ponytail: placeholder cutoffs — tune when UI lands / after tasting tests.
- */
-export const ADDITIVE_ALERTS = {
-	panna: { warn: 15, high: 25 },
-	alcohol: { warn: 2, high: 5 },
-	water: { warn: 10, high: 20 },
-} as const;
-
-/**
- * Base bianca flavor doses per kg of mix (typically calculated on 1000g).
- * Dissolving flavors: subtract the same weight from milk to keep total.
- * Inclusions: add during/at end of churn — do not displace milk.
- * Method/notes copy lives in the App form later — not duplicated here.
- */
-export const BASE_BIANCA_FLAVORS = {
-	coffeeFreezeDried: { gramsPerKg: 20, replaceMilk: true },
-	espresso: { gramsPerKg: 200, replaceMilk: true },
-	vanillaPods: { minPerKg: 2, maxPerKg: 4 },
-	spices: { gramsPerKg: 5, replaceMilk: true },
-	cocoaPowder_22_24: { gramsPerKg: 60, replaceMilk: true },
-	/** Couverture 70% — high fat; often needs recipe rebalance (drop panna/milk → water). */
-	chocolateCouverture70: { gramsPerKg: 170, replaceMilk: true },
-	stracciatella: { gramsPerKg: 100, replaceMilk: false },
-	nuts: { gramsPerKg: 100, replaceMilk: false },
-	candiedFruit: { gramsPerKg: 100, replaceMilk: false },
-	/** Turn base bianca into egg base (mantecato). */
-	eggYolk: { gramsPerKg: 100, replaceMilk: true },
-	/** Crema catalana: caramel pieces at end of churn (on egg base). */
-	catalanaCaramel: { gramsPerKg: 50, replaceMilk: false },
-	/** Cut base sugars when using sugary inclusions (candied, raisins, caramel). */
-	sugaryInclusionSugarCut: { gramsPerKg: 20 },
-} as const;
+import {
+	ADDITIVE_ALERTS,
+	ALCOHOL_MIX_TWEAKS,
+	ALCOHOL_PAC_PER_PURE_GRAM,
+	FRUIT_TO_TOTAL,
+	KIND,
+	PAC_INDEX,
+	type RecipeKind,
+	SERVICE_TEMP,
+	type ServiceTempKey,
+} from "./const";
 
 /** Scale a per-kg dose to an arbitrary mix weight. */
 export const doseFor = (gramsPerKg: number, mixGrams: number) =>
 	(gramsPerKg * mixGrams) / 1000;
 
-export type RecipeKind = "fruit_acid" | "fruit_sweet" | "cream" | "sorbet";
+const round = (n: number, decimals = 1) => {
+	const f = 10 ** decimals;
+	return Math.round(n * f) / f;
+};
+
+/** PAC points from an ingredient, normalized to a 1 kg mix. */
+export function pacPoints(
+	grams: number,
+	index: number,
+	mixGrams: number,
+): number {
+	if (mixGrams <= 0 || grams <= 0) return 0;
+	return round((grams * (index / 100) * 1000) / mixGrams, 1);
+}
+
+export function alcoholPacPoints(
+	liquorGrams: number,
+	abvPercent: number,
+	mixGrams: number,
+): number {
+	if (mixGrams <= 0 || liquorGrams <= 0 || abvPercent <= 0) return 0;
+	const purePerKg = (liquorGrams * (abvPercent / 100) * 1000) / mixGrams;
+	return round(purePerKg * ALCOHOL_PAC_PER_PURE_GRAM, 1);
+}
+
+/** Max liquor (g) that fills a PAC margin at the given ABV. */
+export function maxLiquorGrams(
+	pacMargin: number,
+	abvPercent: number,
+	mixGrams: number,
+): number {
+	if (pacMargin <= 0 || abvPercent <= 0 || mixGrams <= 0) return 0;
+	const purePerKg = pacMargin / ALCOHOL_PAC_PER_PURE_GRAM;
+	return round((purePerKg / (abvPercent / 100)) * (mixGrams / 1000), 1);
+}
+
+export type PacBalance = {
+	tempKey: ServiceTempKey;
+	celsius: -12 | -18;
+	target: number;
+	fromSucrose: number;
+	fromDextrose: number;
+	fromAlcohol: number;
+	total: number;
+	/** Target − sugar PAC (room reserved / available before counting alcohol). */
+	margin: number;
+	/** Target − total PAC (room left after current alcohol). */
+	remaining: number;
+	/** Suggested max additional liquor at abv for `remaining`. */
+	maxLiquorAtAbv: number;
+};
+
+export function computePacBalance(opts: {
+	tempKey: ServiceTempKey;
+	mixGrams: number;
+	sucrose: number;
+	dextrose: number;
+	alcoholGrams?: number;
+	abvPercent?: number;
+}): PacBalance {
+	const temp = SERVICE_TEMP[opts.tempKey];
+	const mix = opts.mixGrams;
+	const fromSucrose = pacPoints(opts.sucrose, PAC_INDEX.sucrose, mix);
+	const fromDextrose = pacPoints(opts.dextrose, PAC_INDEX.dextrose, mix);
+	const abv = opts.abvPercent ?? 0;
+	const fromAlcohol = alcoholPacPoints(opts.alcoholGrams ?? 0, abv, mix);
+	const sugarPac = fromSucrose + fromDextrose;
+	const total = round(sugarPac + fromAlcohol, 1);
+	/** PAC still available after sugars (and before counting current alcohol). */
+	const sugarMargin = round(temp.pacTarget - sugarPac, 1);
+	/** PAC still available after sugars + current alcohol. */
+	const remaining = round(temp.pacTarget - total, 1);
+
+	return {
+		tempKey: opts.tempKey,
+		celsius: temp.celsius,
+		target: temp.pacTarget,
+		fromSucrose,
+		fromDextrose,
+		fromAlcohol,
+		total,
+		margin: sugarMargin,
+		remaining,
+		maxLiquorAtAbv: maxLiquorGrams(Math.max(0, remaining), abv || 40, mix),
+	};
+}
 
 export type RecipeInput = {
 	kind: RecipeKind;
@@ -58,8 +109,12 @@ export type RecipeInput = {
 	fruitGrams?: number;
 	/** Desired mix weight (g). Required for cream; otherwise = fruit × 2.2. */
 	totalGrams?: number;
+	/** Service temperature — scales sugars so mix PAC hits the target. */
+	tempKey?: ServiceTempKey;
 	/** Optional extras on top of the balanced base. */
 	alcoholGrams?: number;
+	/** ABV % of the liquor (needed to reserve PAC for alcohol). */
+	alcoholAbv?: number;
 	/** Extra panna beyond the formula amount. */
 	extraPannaGrams?: number;
 	/** Extra water beyond the formula amount. */
@@ -96,66 +151,7 @@ export type RecipeResult = {
 	/** Percents of final mix for the three watch ingredients. */
 	percents: { panna: number; alcohol: number; water: number };
 	alerts: AdditiveAlert[];
-};
-
-type KindParams = {
-	sugarTotalFactor: number;
-	fruitSugarFactor: number;
-	pannaFactor: number;
-	xanthanFactor: number;
-	lemonPerKg: number;
-	/** Creams use milk residual; sorbets use water residual. */
-	liquid: "milk" | "water";
-	/** Sucrose share of total sugars (rest is dextrose). */
-	sucroseShare: number;
-};
-
-const KIND: Record<RecipeKind, KindParams> = {
-	// Frutta pH < 5 — cream base, lower fruit sugars
-	fruit_acid: {
-		sugarTotalFactor: 0.18,
-		fruitSugarFactor: 0.1,
-		pannaFactor: 0.12,
-		xanthanFactor: 0.0015,
-		lemonPerKg: 0,
-		liquid: "milk",
-		sucroseShare: 0.8,
-	},
-	// Frutta pH > 5
-	fruit_sweet: {
-		sugarTotalFactor: 0.18,
-		fruitSugarFactor: 0.15,
-		pannaFactor: 0.12,
-		xanthanFactor: 0.0015,
-		lemonPerKg: 0.035,
-		liquid: "milk",
-		sucroseShare: 0.8,
-	},
-	// Base bianca (no fruit)
-	cream: {
-		sugarTotalFactor: 0.18,
-		fruitSugarFactor: 0,
-		pannaFactor: 0.17,
-		xanthanFactor: 0.006,
-		lemonPerKg: 0,
-		liquid: "milk",
-		sucroseShare: 0.8,
-	},
-	// Sorbetto
-	sorbet: {
-		sugarTotalFactor: 0.25,
-		fruitSugarFactor: 0.1,
-		pannaFactor: 0,
-		xanthanFactor: 0.005,
-		lemonPerKg: 0.035,
-		liquid: "water",
-		sucroseShare: 0.7,
-	},
-};
-
-const round = (n: number, decimals = 1) => {
-	const f = 10 ** decimals;
-	return Math.round(n * f) / f;
+	pac: PacBalance;
 };
 
 const pct = (part: number, total: number) =>
@@ -189,26 +185,65 @@ function resolveTargetTotal(input: RecipeInput): {
 }
 
 /**
+ * Grams of sucrose+dextrose needed for `desiredPac` at this mix weight & ratio.
+ * PAC = (sucrose×1 + dextrose×1.9) × 1000/mix → sugarTotal × (1.9 − 0.9×share) × 1000/mix
+ */
+function sugarsForPac(
+	desiredPac: number,
+	mixGrams: number,
+	sucroseShare: number,
+): { sucrose: number; dextrose: number } {
+	if (desiredPac <= 0 || mixGrams <= 0) return { sucrose: 0, dextrose: 0 };
+	const pacPerGramAt1kg = 1.9 - 0.9 * sucroseShare;
+	const sugarTotal = (desiredPac * mixGrams) / (1000 * pacPerGramAt1kg);
+	const sucrose = sugarTotal * sucroseShare;
+	return { sucrose, dextrose: sugarTotal - sucrose };
+}
+
+/**
  * Build a balanced gelato/sorbet recipe from fruit (or total) weight.
- * Optional alcohol / extra panna / extra water are added on top of the base;
- * liquid (milk or water) is Q.b. so the base hits targetTotal before extras.
- *
- * Alcohol PAC compensation (reduce sugars so PAC ≈ 270–290) is not applied yet —
- * ponytail: needs full PAC/POD model; surface via alerts until then.
+ * Sugars are scaled so sugar PAC (+ alcohol) hits the service-temperature target.
+ * Liquid (milk or water) is Q.b. to hit targetTotal before extras.
  */
 export function generateRecipe(input: RecipeInput): RecipeResult {
 	const params = KIND[input.kind];
+	const tempKey = input.tempKey ?? "professional";
+	const pacTarget = SERVICE_TEMP[tempKey].pacTarget;
 	const { fruit, targetTotal } = resolveTargetTotal(input);
 
-	const sugarTotal = Math.max(
+	const alcohol = Math.max(0, input.alcoholGrams ?? 0);
+	const abv = Math.max(0, input.alcoholAbv ?? 0);
+	const alcoholPac = alcoholPacPoints(alcohol, abv, targetTotal);
+	const desiredSugarPac = Math.max(0, pacTarget - alcoholPac);
+
+	// Formula sugars as a floor/baseline, then raise/lower to hit PAC target.
+	const baselineSugar = Math.max(
 		0,
 		targetTotal * params.sugarTotalFactor - fruit * params.fruitSugarFactor,
 	);
-	const sucrose = sugarTotal * params.sucroseShare;
-	const dextrose = sugarTotal - sucrose;
+	const baselineSucrose = baselineSugar * params.sucroseShare;
+	const baselineDextrose = baselineSugar - baselineSucrose;
+	const baselinePac =
+		pacPoints(baselineSucrose, PAC_INDEX.sucrose, targetTotal) +
+		pacPoints(baselineDextrose, PAC_INDEX.dextrose, targetTotal);
+
+	const { sucrose, dextrose } =
+		baselinePac > 0
+			? (() => {
+					const scale = desiredSugarPac / baselinePac;
+					return {
+						sucrose: baselineSucrose * scale,
+						dextrose: baselineDextrose * scale,
+					};
+				})()
+			: sugarsForPac(desiredSugarPac, targetTotal, params.sucroseShare);
+
 	const formulaPanna = targetTotal * params.pannaFactor;
 	const lemonJuice = targetTotal * params.lemonPerKg;
-	const xanthan = targetTotal * params.xanthanFactor;
+	let xanthan = targetTotal * params.xanthanFactor;
+	if (alcohol > 0) {
+		xanthan *= 1 + ALCOHOL_MIX_TWEAKS.stabilizerBump;
+	}
 	const salt = targetTotal * 0.0005; // 0.5 g/kg
 
 	const fixed =
@@ -217,7 +252,6 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 	const milk = params.liquid === "milk" ? residual : 0;
 	const formulaWater = params.liquid === "water" ? residual : 0;
 
-	const alcohol = Math.max(0, input.alcoholGrams ?? 0);
 	const extraPanna = Math.max(0, input.extraPannaGrams ?? 0);
 	const extraWater = Math.max(0, input.extraWaterGrams ?? 0);
 
@@ -256,6 +290,15 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		severity: severity(percent, thresholds),
 	}));
 
+	const pac = computePacBalance({
+		tempKey,
+		mixGrams: actualTotal,
+		sucrose: ingredients.sucrose,
+		dextrose: ingredients.dextrose,
+		alcoholGrams: ingredients.alcohol,
+		abvPercent: abv,
+	});
+
 	return {
 		kind: input.kind,
 		targetTotal: round(targetTotal),
@@ -263,5 +306,6 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		ingredients,
 		percents,
 		alerts,
+		pac,
 	};
 }
