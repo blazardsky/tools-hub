@@ -21,6 +21,35 @@ export const ADDITIVE_ALERTS = {
 	water: { warn: 10, high: 20 },
 } as const;
 
+/**
+ * Base bianca flavor doses per kg of mix (typically calculated on 1000g).
+ * Dissolving flavors: subtract the same weight from milk to keep total.
+ * Inclusions: add during/at end of churn — do not displace milk.
+ * Method/notes copy lives in the App form later — not duplicated here.
+ */
+export const BASE_BIANCA_FLAVORS = {
+	coffeeFreezeDried: { gramsPerKg: 20, replaceMilk: true },
+	espresso: { gramsPerKg: 200, replaceMilk: true },
+	vanillaPods: { minPerKg: 2, maxPerKg: 4 },
+	spices: { gramsPerKg: 5, replaceMilk: true },
+	cocoaPowder_22_24: { gramsPerKg: 60, replaceMilk: true },
+	/** Couverture 70% — high fat; often needs recipe rebalance (drop panna/milk → water). */
+	chocolateCouverture70: { gramsPerKg: 170, replaceMilk: true },
+	stracciatella: { gramsPerKg: 100, replaceMilk: false },
+	nuts: { gramsPerKg: 100, replaceMilk: false },
+	candiedFruit: { gramsPerKg: 100, replaceMilk: false },
+	/** Turn base bianca into egg base (mantecato). */
+	eggYolk: { gramsPerKg: 100, replaceMilk: true },
+	/** Crema catalana: caramel pieces at end of churn (on egg base). */
+	catalanaCaramel: { gramsPerKg: 50, replaceMilk: false },
+	/** Cut base sugars when using sugary inclusions (candied, raisins, caramel). */
+	sugaryInclusionSugarCut: { gramsPerKg: 20 },
+} as const;
+
+/** Scale a per-kg dose to an arbitrary mix weight. */
+export const doseFor = (gramsPerKg: number, mixGrams: number) =>
+	(gramsPerKg * mixGrams) / 1000;
+
 export type RecipeKind = "fruit_acid" | "fruit_sweet" | "cream" | "sorbet";
 
 export type RecipeInput = {
