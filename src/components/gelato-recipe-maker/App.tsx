@@ -8,9 +8,11 @@ import {
 	FRUIT_TO_TOTAL,
 	fieldClass,
 	INGREDIENT_ROWS,
+	INVERT_SUGAR_HOWTO,
 	KIND_OPTIONS,
 	LACTOSE_FREE,
 	labelClass,
+	MIX_PROCEDURE,
 	PAC_INDEX,
 	POD_INDEX,
 	type RecipeKind,
@@ -276,7 +278,10 @@ export default function App() {
 					</div>
 					{result ? (
 						<p className="text-sm text-[rgb(var(--text-muted))]">
-							Sugars scaled to PAC {result.pac.target}: sucrose{" "}
+							{result.sugarMode === "common"
+								? "Edible sucrose dose (not scaled to full PAC)"
+								: `Sugars scaled to PAC ${result.pac.target}`}
+							: sucrose{" "}
 							<span className="tabular-nums text-[rgb(var(--text-title))]">
 								{result.ingredients.sucrose} g
 							</span>
@@ -286,6 +291,15 @@ export default function App() {
 									dextrose{" "}
 									<span className="tabular-nums text-[rgb(var(--text-title))]">
 										{result.ingredients.dextrose} g
+									</span>
+								</>
+							) : null}
+							{result.ingredients.invertedSugar > 0 ? (
+								<>
+									{" · "}
+									invert{" "}
+									<span className="tabular-nums text-[rgb(var(--text-title))]">
+										{result.ingredients.invertedSugar} g
 									</span>
 								</>
 							) : null}
@@ -299,9 +313,14 @@ export default function App() {
 								</>
 							) : null}
 							{" · "}
-							total PAC{" "}
+							PAC{" "}
 							<span className="tabular-nums text-[rgb(var(--text-title))]">
 								{result.pac.total}
+							</span>
+							{" · "}
+							POD{" "}
+							<span className="tabular-nums text-[rgb(var(--text-title))]">
+								{result.pod}%
 							</span>
 							{addAlcohol && result.ingredients.alcohol > 0
 								? " (sugars leave room for alcohol)"
@@ -309,8 +328,8 @@ export default function App() {
 						</p>
 					) : (
 						<p className="text-sm text-[rgb(var(--text-muted))]">
-							Choosing a temperature rebalances sucrose/dextrose (and
-							milk/water) so the mix scoops at that freezer setting.
+							Choosing a temperature rebalances sugars (and milk/water) so the
+							mix scoops at that freezer setting.
 						</p>
 					)}
 				</fieldset>
@@ -318,54 +337,131 @@ export default function App() {
 				<fieldset className="space-y-3">
 					<legend className={labelClass}>Sugar options</legend>
 					<p className="text-sm text-[rgb(var(--text-muted))]">
-						Default uses sucrose + dextrose. Pick one alternative if you only
-						have kitchen sugar or honey.
+						Default is sucrose + dextrose. Sucrose alone has PAC:POD = 1:1 —
+						hitting PAC {SERVICE_TEMP.home.pacTarget} (−18°C) would mean ~41%
+						sugar.
 					</p>
-					<div className="space-y-2">
-						<label className="flex items-start gap-2 text-sm">
-							<input
-								type="checkbox"
-								className="mt-1"
-								checked={sugarMode === "common"}
-								onChange={(e) =>
-									setSugarMode(e.target.checked ? "common" : "blend")
-								}
-							/>
-							<span>
-								<span className="font-medium text-[rgb(var(--text-title))]">
-									Common sugar only
+					<div className="grid gap-2 sm:grid-cols-2">
+						{(
+							Object.entries(SUGAR_MODES) as [
+								SugarMode,
+								(typeof SUGAR_MODES)[SugarMode],
+							][]
+						).map(([key, mode]) => (
+							<label
+								key={key}
+								className={cn(
+									"flex cursor-pointer gap-2 border border-[rgb(var(--page-border))] px-3 py-2",
+									sugarMode === key &&
+										"border-[rgb(var(--brand))] bg-[rgb(var(--neutral-light))]",
+								)}
+							>
+								<input
+									type="radio"
+									name="sugarMode"
+									value={key}
+									checked={sugarMode === key}
+									onChange={() => setSugarMode(key)}
+									className="mt-1"
+								/>
+								<span>
+									<span className="block text-sm font-medium text-[rgb(var(--text-title))]">
+										{mode.label}
+									</span>
+									<span className="block text-sm text-[rgb(var(--text-muted))]">
+										{mode.hint}
+									</span>
 								</span>
-								<span className="mt-0.5 block text-[rgb(var(--text-muted))]">
-									{SUGAR_MODES.common.note}
-								</span>
-							</span>
-						</label>
-						<label className="flex items-start gap-2 text-sm">
-							<input
-								type="checkbox"
-								className="mt-1"
-								checked={sugarMode === "honey"}
-								onChange={(e) =>
-									setSugarMode(e.target.checked ? "honey" : "blend")
-								}
-							/>
-							<span>
-								<span className="font-medium text-[rgb(var(--text-title))]">
-									Honey
-								</span>
-								<span className="mt-0.5 block text-[rgb(var(--text-muted))]">
-									{SUGAR_MODES.honey.note}
-								</span>
-							</span>
-						</label>
+							</label>
+						))}
 					</div>
+					{result?.sucroseAdvisory ? (
+						<div className="space-y-2 border border-[rgb(var(--page-border))] p-3 text-sm">
+							<p className="font-medium text-[rgb(var(--text-title))]">
+								Sucrose-only limit @ {result.pac.celsius}°C
+							</p>
+							<p className="text-[rgb(var(--text-muted))]">
+								Target PAC {result.pac.target} with only sucrose needs{" "}
+								<span className="tabular-nums text-[rgb(var(--text-title))]">
+									{result.sucroseAdvisory.sucroseGramsForTarget} g
+								</span>{" "}
+								(POD{" "}
+								<span className="tabular-nums text-[rgb(var(--text-title))]">
+									{result.sucroseAdvisory.podIfSucroseOnly}%
+								</span>
+								) — cloying and prone to crystallization. This recipe keeps an
+								edible dose (POD {result.pod}%) and leaves PAC short by{" "}
+								<span className="tabular-nums text-[rgb(var(--text-title))]">
+									{result.sucroseAdvisory.pacShortfall}
+								</span>
+								.
+							</p>
+							<ul className="list-disc space-y-1 pl-5 text-[rgb(var(--text-muted))]">
+								<li>
+									<strong className="font-medium text-[rgb(var(--text-title))]">
+										Dextrose
+									</strong>{" "}
+									(best): ~{result.sucroseAdvisory.dextroseGramsForTarget} g
+									alone → PAC {result.pac.target}, POD ~
+									{result.sucroseAdvisory.podWithDextrose}% (PAC 190 / POD 70).
+								</li>
+								<li>
+									<strong className="font-medium text-[rgb(var(--text-title))]">
+										Inverted sugar
+									</strong>
+									: ~{result.sucroseAdvisory.invertGramsForTarget} g alone → POD
+									~{result.sucroseAdvisory.podWithInvert}% (PAC 190 / POD 130) —
+									sweeter than dextrose, still far better than 41% sucrose.
+									Switch sugar option above, or make it at home:
+								</li>
+								<li>
+									<strong className="font-medium text-[rgb(var(--text-title))]">
+										Alcohol
+									</strong>
+									: +{result.sucroseAdvisory.alcoholToCloseG} g at{" "}
+									{alcoholAbv || 40}% ABV closes the PAC gap with no added
+									sweetness (rule: 1% pure alcohol / kg ≈ 9 PAC). Enable Add
+									alcohol below.
+								</li>
+							</ul>
+							<details className="text-[rgb(var(--text-muted))]">
+								<summary className="cursor-pointer font-medium text-[rgb(var(--text-title))]">
+									How to make inverted sugar
+								</summary>
+								<p className="mt-2">{INVERT_SUGAR_HOWTO.summary}</p>
+								<ol className="mt-2 list-decimal space-y-1 pl-5">
+									{INVERT_SUGAR_HOWTO.steps.map((step) => (
+										<li key={step}>{step}</li>
+									))}
+								</ol>
+							</details>
+							<p className="text-[rgb(var(--text-muted))]">
+								Cold, overrun, and bitter ingredients (cocoa) also mute
+								perceived sweetness vs the POD number.
+							</p>
+						</div>
+					) : null}
+					{sugarMode === "inverted" ? (
+						<details className="text-sm text-[rgb(var(--text-muted))]">
+							<summary className="cursor-pointer font-medium text-[rgb(var(--text-title))]">
+								How to make inverted sugar
+							</summary>
+							<p className="mt-2">{INVERT_SUGAR_HOWTO.summary}</p>
+							<ol className="mt-2 list-decimal space-y-1 pl-5">
+								{INVERT_SUGAR_HOWTO.steps.map((step) => (
+									<li key={step}>{step}</li>
+								))}
+							</ol>
+						</details>
+					) : null}
 				</fieldset>
 
 				<fieldset className="space-y-4">
 					<legend className={labelClass}>Optional additives</legend>
 					<p className="text-sm text-[rgb(var(--text-muted))]">
-						Extra panna/water sit on top of the base. Alcohol displaces
-						milk/water and sugars are cut so PAC stays on target.
+						Extra panna/water displace milk (or water). Alcohol displaces liquid
+						and rebalances sugars (prefer sucrose), +25% stabilizer. Casein is
+						optional advice only.
 					</p>
 
 					<div className="space-y-3">
@@ -373,7 +469,17 @@ export default function App() {
 							<input
 								type="checkbox"
 								checked={addAlcohol}
-								onChange={(e) => setAddAlcohol(e.target.checked)}
+								onChange={(e) => {
+									const on = e.target.checked;
+									setAddAlcohol(on);
+									if (on && !alcoholGrams.trim()) {
+										const suggested =
+											result?.sucroseAdvisory?.alcoholToCloseG ?? 0;
+										if (suggested > 0) {
+											setAlcoholGrams(suggested.toFixed(1));
+										}
+									}
+								}}
 							/>
 							Add alcohol
 						</label>
@@ -388,7 +494,9 @@ export default function App() {
 										pac
 											? alcoholGrams && parseGrams(alcoholGrams) > 0
 												? `PAC reserved; ${pac.maxLiquorAtAbv} g more fits @ ${alcoholAbv || 40}%`
-												: `Max ≈ ${pac.maxLiquorAtAbv} g at ${alcoholAbv || 40}% for PAC margin`
+												: pac.maxLiquorAtAbv > 0
+													? `Max ≈ ${pac.maxLiquorAtAbv} g at ${alcoholAbv || 40}% for PAC margin`
+													: `Enter grams — sugars drop to reserve PAC @ ${alcoholAbv || 40}%`
 											: undefined
 									}
 								/>
@@ -399,7 +507,7 @@ export default function App() {
 									onChange={setAlcoholAbv}
 									min={1}
 									suffix="%"
-									hint={`+${ALCOHOL_MIX_TWEAKS.caseinGramsPerKg} g/kg casein · stabilizer +${ALCOHOL_MIX_TWEAKS.stabilizerBump * 100}% · prefer sucrose`}
+									hint={`Tip: +${ALCOHOL_MIX_TWEAKS.caseinGramsPerKg} g/kg pure casein · stabilizer +${ALCOHOL_MIX_TWEAKS.stabilizerBump * 100}% · prefer sucrose`}
 								/>
 							</div>
 						) : null}
@@ -512,6 +620,9 @@ export default function App() {
 										{pac.fromDextrose > 0
 											? ` + ${pac.fromDextrose} (dextrose)`
 											: ""}
+										{pac.fromInverted > 0
+											? ` + ${pac.fromInverted} (invert)`
+											: ""}
 										{pac.fromHoney > 0 ? ` + ${pac.fromHoney} (honey)` : ""}
 									</li>
 									<li>Alcohol: {pac.fromAlcohol}</li>
@@ -523,10 +634,16 @@ export default function App() {
 												? " — above target (softer scoop)"
 												: " — below target (firmer)"}
 									</li>
+									<li>POD (sweetness): {result.pod}%</li>
 									{addAlcohol ? (
 										<li>
 											Room left: {Math.max(0, pac.remaining)} ≈ max{" "}
 											{pac.maxLiquorAtAbv} g more @ {alcoholAbv || 40}%
+										</li>
+									) : result.sugarMode === "common" ? (
+										<li>
+											PAC shortfall {Math.max(0, pac.remaining)} — add alcohol
+											or switch to dextrose / invert (see Sugar options).
 										</li>
 									) : (
 										<li>
@@ -537,15 +654,34 @@ export default function App() {
 								</ul>
 								<p className="text-sm text-[rgb(var(--text-muted))]">
 									Indexes — PAC sucrose {PAC_INDEX.sucrose} / dextrose{" "}
-									{PAC_INDEX.dextrose} / honey {PAC_INDEX.honey} / invert{" "}
-									{PAC_INDEX.invertedSugar}. POD sucrose {POD_INDEX.sucrose} /
-									dextrose {POD_INDEX.dextrose} / honey {POD_INDEX.honey} /
-									lactose {POD_INDEX.lactose}. Lactose-free milk raises PAC &
-									POD — cut sugars ~{LACTOSE_FREE.sugarCutFraction * 100}% if
-									soft or too sweet.
+									{PAC_INDEX.dextrose} / invert {PAC_INDEX.invertedSugar} /
+									honey {PAC_INDEX.honey}. POD sucrose {POD_INDEX.sucrose} /
+									dextrose {POD_INDEX.dextrose} / invert{" "}
+									{POD_INDEX.invertedSugar} / honey {POD_INDEX.honey} / lactose{" "}
+									{POD_INDEX.lactose}. Lactose-free milk raises PAC & POD — cut
+									sugars ~{LACTOSE_FREE.sugarCutFraction * 100}% if soft or too
+									sweet.
 								</p>
 							</div>
 						) : null}
+
+						<div className="space-y-3 border border-[rgb(var(--page-border))] p-3">
+							<h3 className="text-base font-medium text-[rgb(var(--text-title))]">
+								{MIX_PROCEDURE.title}
+							</h3>
+							{MIX_PROCEDURE.stages.map((stage) => (
+								<div key={stage.title} className="space-y-1">
+									<p className="text-sm font-medium text-[rgb(var(--text-title))]">
+										{stage.title}
+									</p>
+									<ul className="list-disc space-y-1 pl-5 text-sm text-[rgb(var(--text-muted))]">
+										{stage.points.map((point) => (
+											<li key={point}>{point}</li>
+										))}
+									</ul>
+								</div>
+							))}
+						</div>
 					</>
 				)}
 			</section>

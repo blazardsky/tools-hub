@@ -80,39 +80,106 @@ export const PAC_INDEX = {
 export const POD_INDEX = {
 	sucrose: 100,
 	dextrose: 70,
-	/** Honey is sweeter than sucrose — approximate. */
+	invertedSugar: 130,
+	/** Honey ≈ invert sugar sweetness. */
 	honey: 130,
 	lactose: 16,
 } as const;
 
 /**
- * Kitchen-sugar / honey modes when dextrose isn't available.
- * Default blend keeps KIND.sucroseShare (80/20 creams, 70/30 sorbet).
+ * Sugar strategies. Default `blend` keeps KIND.sucroseShare (80/20 creams, 70/30 sorbet).
+ * Sucrose alone has PAC:POD = 1:1 — impossible to hit PAC 410 (−18°C) without ~41% sugar.
  */
 export const SUGAR_MODES = {
 	blend: {
-		label: "Sucrose + dextrose",
+		label: "Sucrose + dextrose (recommended)",
 		sucroseOnly: false,
 		useHoney: false,
+		useInvert: false,
+		hint: "Dextrose PAC 190 / POD 70 — raises freeze resistance without cloying sweetness.",
 	},
-	common: {
-		label: "Common sugar (sucrose only)",
-		sucroseOnly: true,
+	inverted: {
+		label: "Sucrose + inverted sugar",
+		sucroseOnly: false,
 		useHoney: false,
-		/** Creams 17–18%; sorbets 22–24% when no technical sugars. */
-		creamSugarFactor: 0.175,
-		sorbetSugarFactor: 0.23,
-		note: "Hardens or turns sandy in the freezer — eat soon. Dissolve fully in warm milk. A splash of alcohol helps PAC.",
+		useInvert: true,
+		hint: "Invert PAC 190 / POD 130 — softer scoop than sucrose alone; still sweeter than dextrose.",
 	},
 	honey: {
-		label: "Honey (replaces dextrose)",
+		label: "Sucrose + honey",
 		sucroseOnly: false,
 		useHoney: true,
-		note: "PAC 190 like invert sugar — keeps the scoop soft. Prefer acacia for a milder flavour.",
+		useInvert: false,
+		hint: "Honey ≈ invert (PAC 190 / POD 130). Prefer acacia for a milder flavour.",
+	},
+	common: {
+		label: "Common sugar only (sucrose)",
+		sucroseOnly: true,
+		useHoney: false,
+		useInvert: false,
+		/** Creams 17–18%; sorbets 22–24% — edible sweetness, not full −18°C PAC. */
+		creamSugarFactor: 0.175,
+		sorbetSugarFactor: 0.23,
+		hint: "PAC:POD = 1:1 — cannot hit freezer PAC without tasting sickly. Prefer dextrose, invert, or alcohol.",
 	},
 } as const;
 
 export type SugarMode = keyof typeof SUGAR_MODES;
+
+/** DIY invert-sugar procedure (shown when sucrose-only or invert mode). */
+export const INVERT_SUGAR_HOWTO = {
+	summary:
+		"Invert sugar splits sucrose into glucose + fructose: PAC 190 (vs 100) and blocks crystallization.",
+	steps: [
+		"Dissolve sucrose in water and heat with a little acid (citric acid, cream of tartar, or lemon juice).",
+		"Acid + heat cleaves sucrose into glucose and fructose.",
+		"Simple formula: heat a sugar–water solution to 80°C with a pinch of citric acid; ~30 min → >90% inversion, fine for home use.",
+	],
+} as const;
+
+/** Mix / pasteurization / maturation procedure (shown below PAC balance). */
+export const MIX_PROCEDURE = {
+	title: "Mix procedure",
+	stages: [
+		{
+			title: "1. Mixing order",
+			points: [
+				"Cold liquids first: pour milk and panna.",
+				"Rain in powders (sugars, milk powder) while still cold; agitate hard to avoid lumps.",
+				"Stabilizer (neutro / xanthan): blend with a little sugar and add around 40°C so it disperses instead of floating on steam.",
+			],
+		},
+		{
+			title: "2. Heat to 85°C (high pasteurization)",
+			points: [
+				"Bring the mix to 85°C; start cooling immediately or after a few seconds (no long hold).",
+				"Not only sanitation: activates neutri/stabilizers (best hydration above ~80–82°C), emulsifies fats, dissolves sugars evenly, and hydrates milk proteins so they bind free water.",
+			],
+		},
+		{
+			title: "3. Rapid cool 85°C → 4°C",
+			points: [
+				"Cool as fast as possible — ideally under 1 hour (heating + cooling together under ~2 hours).",
+				"45°C → 15°C is the critical bacterial window; pass it as quickly as you can.",
+			],
+		},
+		{
+			title: "4. Maturation (6–12 h at 4°C)",
+			points: [
+				"Rest in the fridge 6–12 hours (some texts allow up to 14).",
+				"Fats crystallize, proteins finish hydrating, stabilizers bind free water → creamier scoop, fewer large ice crystals, better overrun.",
+			],
+		},
+		{
+			title: "5. Churn & fruit timing",
+			points: [
+				"Load the mantecatore at ≤ 4°C so you keep the air built during maturation.",
+				"Acid fruit (pH < 5): add at the end, preferably in the churn when the base is under ~2°C — cold stops casein precipitation (“cutting”).",
+				"Browning fruit (banana, peach): fold in last and churn immediately to keep colour.",
+			],
+		},
+	],
+} as const;
 
 /**
  * Pure alcohol grams × this = PAC points (per kg mix convention).
@@ -120,8 +187,9 @@ export type SugarMode = keyof typeof SUGAR_MODES;
  */
 export const ALCOHOL_PAC_PER_PURE_GRAM = 9;
 
-/** Recipe tweaks when alcohol is in the mix. */
+/** Recipe tweaks when alcohol is in the mix (casein is advice only — not auto-dosed). */
 export const ALCOHOL_MIX_TWEAKS = {
+	/** Suggested pure casein if using alcohol — show as tip, not an ingredient line. */
 	caseinGramsPerKg: 20,
 	/** Increase neutro/stabilizer vs normal dose. */
 	stabilizerBump: 0.25,
@@ -230,6 +298,7 @@ export const INGREDIENT_ROWS = [
 	{ key: "milk", label: "Milk" },
 	{ key: "sucrose", label: "Sucrose" },
 	{ key: "dextrose", label: "Dextrose" },
+	{ key: "invertedSugar", label: "Inverted sugar" },
 	{ key: "honey", label: "Honey" },
 	{ key: "panna", label: "Panna (35%)" },
 	{ key: "water", label: "Water" },
