@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import {
 	ALCOHOL_MIX_TWEAKS,
 	BASE_BIANCA_FLAVORS,
+	CASEIN_ADVICE,
 	FLAVOR_ROWS,
 	FRUIT_TO_TOTAL,
 	fieldClass,
@@ -11,6 +12,7 @@ import {
 	INVERT_SUGAR_HOWTO,
 	KIND_OPTIONS,
 	LACTOSE_FREE,
+	LEMON_MIX_TWEAKS,
 	labelClass,
 	MIX_PROCEDURE,
 	PAC_INDEX,
@@ -107,10 +109,14 @@ export default function App() {
 	const [addAlcohol, setAddAlcohol] = useState(false);
 	const [alcoholGrams, setAlcoholGrams] = useState("");
 	const [alcoholAbv, setAlcoholAbv] = useState("40");
+	/** Casein advice — defaults on when alcohol is enabled; user can turn off. */
+	const [useCaseinAdvice, setUseCaseinAdvice] = useState(true);
 	const [addPanna, setAddPanna] = useState(false);
 	const [extraPannaGrams, setExtraPannaGrams] = useState("");
 	const [addWater, setAddWater] = useState(false);
 	const [extraWaterGrams, setExtraWaterGrams] = useState("");
+	const [addLemon, setAddLemon] = useState(false);
+	const [extraLemonGrams, setExtraLemonGrams] = useState("");
 
 	const isCream = kind === "cream";
 	const kindMeta = KIND_OPTIONS.find((o) => o.value === kind);
@@ -131,6 +137,7 @@ export default function App() {
 				alcoholAbv: addAlcohol && Number.isFinite(abv) && abv > 0 ? abv : 0,
 				extraPannaGrams: addPanna ? parseGrams(extraPannaGrams) : 0,
 				extraWaterGrams: addWater ? parseGrams(extraWaterGrams) : 0,
+				extraLemonGrams: addLemon ? parseGrams(extraLemonGrams) : 0,
 			});
 		} catch {
 			return null;
@@ -149,6 +156,8 @@ export default function App() {
 		extraPannaGrams,
 		addWater,
 		extraWaterGrams,
+		addLemon,
+		extraLemonGrams,
 	]);
 
 	const pac = result?.pac ?? null;
@@ -166,10 +175,13 @@ export default function App() {
 		setAddAlcohol(false);
 		setAlcoholGrams("");
 		setAlcoholAbv("40");
+		setUseCaseinAdvice(true);
 		setAddPanna(false);
 		setExtraPannaGrams("");
 		setAddWater(false);
 		setExtraWaterGrams("");
+		setAddLemon(false);
+		setExtraLemonGrams("");
 	};
 
 	return (
@@ -381,7 +393,8 @@ export default function App() {
 								Limite solo saccarosio @ {result.pac.celsius}°C
 							</p>
 							<p className="text-[rgb(var(--text-muted))]">
-								Il PAC target {result.pac.target} con solo saccarosio richiederebbe{" "}
+								Il PAC target {result.pac.target} con solo saccarosio
+								richiederebbe{" "}
 								<span className="tabular-nums text-[rgb(var(--text-title))]">
 									{result.sucroseAdvisory.sucroseGramsForTarget} g
 								</span>{" "}
@@ -461,9 +474,13 @@ export default function App() {
 				<fieldset className="space-y-4">
 					<legend className={labelClass}>Additivi opzionali</legend>
 					<p className="text-sm text-[rgb(var(--text-muted))]">
-						Panna/acqua extra spostano latte (o acqua). L'alcol sposta liquido e
-						ribilancia gli zuccheri (preferisci saccarosio), +25% stabilizzante.
-						La caseina è solo un consiglio opzionale.
+						Panna/acqua/limone extra spostano latte (o acqua). L'alcol sposta
+						liquido e ribilancia gli zuccheri (preferisci saccarosio), +
+						{ALCOHOL_MIX_TWEAKS.stabilizerBump * 100}% stabilizzante. Il limone
+						alza lo xantano del {LEMON_MIX_TWEAKS.stabilizerBumpPerStep * 100}%
+						ogni {LEMON_MIX_TWEAKS.lemonPercentPerStep}% di limone in miscela, e
+						va aggiunto a freddo se c'è latte. Con alcol si consiglia caseina
+						pura (disattivabile).
 					</p>
 
 					<div className="space-y-3">
@@ -474,11 +491,14 @@ export default function App() {
 								onChange={(e) => {
 									const on = e.target.checked;
 									setAddAlcohol(on);
-									if (on && !alcoholGrams.trim()) {
-										const suggested =
-											result?.sucroseAdvisory?.alcoholToCloseG ?? 0;
-										if (suggested > 0) {
-											setAlcoholGrams(suggested.toFixed(1));
+									if (on) {
+										setUseCaseinAdvice(true);
+										if (!alcoholGrams.trim()) {
+											const suggested =
+												result?.sucroseAdvisory?.alcoholToCloseG ?? 0;
+											if (suggested > 0) {
+												setAlcoholGrams(suggested.toFixed(1));
+											}
 										}
 									}
 								}}
@@ -486,31 +506,41 @@ export default function App() {
 							Aggiungi alcol
 						</label>
 						{addAlcohol ? (
-							<div className="grid gap-3 sm:grid-cols-2">
-								<NumberField
-									id="alcoholGrams"
-									label="Alcol"
-									value={alcoholGrams}
-									onChange={setAlcoholGrams}
-									hint={
-										pac
-											? alcoholGrams && parseGrams(alcoholGrams) > 0
-												? `PAC riservato; altri ${pac.maxLiquorAtAbv} g stanno @ ${alcoholAbv || 40}%`
-												: pac.maxLiquorAtAbv > 0
-													? `Max ≈ ${pac.maxLiquorAtAbv} g al ${alcoholAbv || 40}% per margine PAC`
-													: `Inserisci i grammi — gli zuccheri calano per riservare PAC @ ${alcoholAbv || 40}%`
-											: undefined
-									}
-								/>
-								<NumberField
-									id="alcoholAbv"
-									label="Gradazione"
-									value={alcoholAbv}
-									onChange={setAlcoholAbv}
-									min={1}
-									suffix="%"
-									hint={`Consiglio: +${ALCOHOL_MIX_TWEAKS.caseinGramsPerKg} g/kg caseina pura · stabilizzante +${ALCOHOL_MIX_TWEAKS.stabilizerBump * 100}% · preferisci saccarosio`}
-								/>
+							<div className="space-y-3">
+								<div className="grid gap-3 sm:grid-cols-2">
+									<NumberField
+										id="alcoholGrams"
+										label="Alcol"
+										value={alcoholGrams}
+										onChange={setAlcoholGrams}
+										hint={
+											pac
+												? alcoholGrams && parseGrams(alcoholGrams) > 0
+													? `PAC riservato; altri ${pac.maxLiquorAtAbv} g stanno @ ${alcoholAbv || 40}%`
+													: pac.maxLiquorAtAbv > 0
+														? `Max ≈ ${pac.maxLiquorAtAbv} g al ${alcoholAbv || 40}% per margine PAC`
+														: `Inserisci i grammi — gli zuccheri calano per riservare PAC @ ${alcoholAbv || 40}%`
+												: undefined
+										}
+									/>
+									<NumberField
+										id="alcoholAbv"
+										label="Gradazione"
+										value={alcoholAbv}
+										onChange={setAlcoholAbv}
+										min={1}
+										suffix="%"
+										hint={`Stabilizzante +${ALCOHOL_MIX_TWEAKS.stabilizerBump * 100}% · preferisci saccarosio`}
+									/>
+								</div>
+								<label className="flex items-center gap-2 text-sm">
+									<input
+										type="checkbox"
+										checked={useCaseinAdvice}
+										onChange={(e) => setUseCaseinAdvice(e.target.checked)}
+									/>
+									Consiglia caseina pura (+{CASEIN_ADVICE.gramsPerKg} g/kg)
+								</label>
 							</div>
 						) : null}
 
@@ -547,6 +577,39 @@ export default function App() {
 								onChange={setExtraWaterGrams}
 							/>
 						) : null}
+
+						<label className="flex items-center gap-2 text-sm">
+							<input
+								type="checkbox"
+								checked={addLemon}
+								onChange={(e) => {
+									const on = e.target.checked;
+									setAddLemon(on);
+									if (on && !extraLemonGrams.trim() && result) {
+										setExtraLemonGrams(
+											String(
+												Math.round(
+													doseFor(
+														LEMON_MIX_TWEAKS.typicalGramsPerKg,
+														result.targetTotal,
+													),
+												),
+											),
+										);
+									}
+								}}
+							/>
+							Aggiungi succo di limone extra
+						</label>
+						{addLemon ? (
+							<NumberField
+								id="extraLemonGrams"
+								label="Succo di limone extra"
+								value={extraLemonGrams}
+								onChange={setExtraLemonGrams}
+								hint={`PAC/POD ${PAC_INDEX.lemonJuice} per 100 g · sposta latte/acqua · xantano +${LEMON_MIX_TWEAKS.stabilizerBumpPerStep * 100}% ogni ${LEMON_MIX_TWEAKS.lemonPercentPerStep}% limone · tipico ~${LEMON_MIX_TWEAKS.typicalGramsPerKg} g/kg`}
+							/>
+						) : null}
 					</div>
 				</fieldset>
 
@@ -563,8 +626,8 @@ export default function App() {
 				</h2>
 				{!result ? (
 					<p className="text-[rgb(var(--text-muted))]">
-						Inserisci un peso di {isCream ? "miscela" : "frutta"} per generare le
-						quantità.
+						Inserisci un peso di {isCream ? "miscela" : "frutta"} per generare
+						le quantità.
 					</p>
 				) : (
 					<>
@@ -615,9 +678,40 @@ export default function App() {
 								</li>
 							))}
 						</ul>
+						{result.tips.length > 0 ? (
+							<ul className="space-y-1 text-sm text-[rgb(var(--brand))]">
+								{result.tips.map((tip) => (
+									<li key={tip}>{tip}</li>
+								))}
+							</ul>
+						) : null}
+						{addAlcohol && useCaseinAdvice && result.ingredients.alcohol > 0 ? (
+							<div className="space-y-1 border border-[rgb(var(--page-border))] p-3 text-sm">
+								<p className="font-medium text-[rgb(var(--text-title))]">
+									Caseina consigliata:{" "}
+									<span className="tabular-nums">
+										{Math.round(
+											doseFor(CASEIN_ADVICE.gramsPerKg, result.actualTotal) *
+												10,
+										) / 10}{" "}
+										g
+									</span>{" "}
+									(+{CASEIN_ADVICE.gramsPerKg} g/kg — non in tabella: aggiungi a
+									mano)
+								</p>
+								<p className="text-[rgb(var(--text-muted))]">
+									{CASEIN_ADVICE.alcoholTip}
+								</p>
+								{kind === "fruit_acid" || result.ingredients.lemonJuice > 0 ? (
+									<p className="text-[rgb(var(--brand))]">
+										{CASEIN_ADVICE.acidWarning}
+									</p>
+								) : null}
+							</div>
+						) : null}
 						<p className="text-sm text-[rgb(var(--text-muted))]">
-							Xantano max ≈ {TARGETS.xanthanMaxPercent}% della miscela —
-							mescola a secco con gli zuccheri prima dei liquidi.
+							Xantano max ≈ {TARGETS.xanthanMaxPercent}% della miscela — mescola
+							a secco con gli zuccheri prima dei liquidi.
 						</p>
 
 						{pac ? (
@@ -637,6 +731,7 @@ export default function App() {
 											: ""}
 										{pac.fromHoney > 0 ? ` + ${pac.fromHoney} (miele)` : ""}
 									</li>
+									{pac.fromLemon > 0 ? <li>Limone: {pac.fromLemon}</li> : null}
 									<li>Alcol: {pac.fromAlcohol}</li>
 									<li>
 										Totale: {pac.total}
@@ -667,11 +762,12 @@ export default function App() {
 								<p className="text-sm text-[rgb(var(--text-muted))]">
 									Indici — PAC saccarosio {PAC_INDEX.sucrose} / destrosio{" "}
 									{PAC_INDEX.dextrose} / invertito {PAC_INDEX.invertedSugar} /
-									miele {PAC_INDEX.honey}. POD saccarosio {POD_INDEX.sucrose} /
-									destrosio {POD_INDEX.dextrose} / invertito{" "}
-									{POD_INDEX.invertedSugar} / miele {POD_INDEX.honey} / lattosio{" "}
-									{POD_INDEX.lactose}. Il latte senza lattosio alza PAC e POD —
-									riduci gli zuccheri di ~
+									miele {PAC_INDEX.honey} / limone {PAC_INDEX.lemonJuice}. POD
+									saccarosio {POD_INDEX.sucrose} / destrosio{" "}
+									{POD_INDEX.dextrose} / invertito {POD_INDEX.invertedSugar} /
+									miele {POD_INDEX.honey} / limone {POD_INDEX.lemonJuice} /
+									lattosio {POD_INDEX.lactose}. Il latte senza lattosio alza PAC
+									e POD — riduci gli zuccheri di ~
 									{LACTOSE_FREE.sugarCutFraction * 100}% se risulta morbido o
 									troppo dolce.
 								</p>

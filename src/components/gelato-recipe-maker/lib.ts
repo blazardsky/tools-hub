@@ -6,6 +6,7 @@ import {
 	ALCOHOL_PAC_PER_PURE_GRAM,
 	FRUIT_TO_TOTAL,
 	KIND,
+	LEMON_MIX_TWEAKS,
 	PAC_INDEX,
 	POD_INDEX,
 	type RecipeKind,
@@ -63,6 +64,7 @@ export function podPercent(
 		dextrose?: number;
 		honey?: number;
 		invertedSugar?: number;
+		lemonJuice?: number;
 	},
 ): number {
 	if (mixGrams <= 0) return 0;
@@ -70,7 +72,8 @@ export function podPercent(
 		(parts.sucrose ?? 0) * (POD_INDEX.sucrose / 100) +
 		(parts.dextrose ?? 0) * (POD_INDEX.dextrose / 100) +
 		(parts.honey ?? 0) * (POD_INDEX.honey / 100) +
-		(parts.invertedSugar ?? 0) * (POD_INDEX.invertedSugar / 100);
+		(parts.invertedSugar ?? 0) * (POD_INDEX.invertedSugar / 100) +
+		(parts.lemonJuice ?? 0) * (POD_INDEX.lemonJuice / 100);
 	return round((eq / mixGrams) * 100, 1);
 }
 
@@ -82,6 +85,7 @@ export type PacBalance = {
 	fromDextrose: number;
 	fromHoney: number;
 	fromInverted: number;
+	fromLemon: number;
 	fromAlcohol: number;
 	total: number;
 	/** Target − sugar PAC (room reserved / available before counting alcohol). */
@@ -99,6 +103,7 @@ export function computePacBalance(opts: {
 	dextrose: number;
 	honey?: number;
 	invertedSugar?: number;
+	lemonJuice?: number;
 	alcoholGrams?: number;
 	abvPercent?: number;
 }): PacBalance {
@@ -112,10 +117,11 @@ export function computePacBalance(opts: {
 		PAC_INDEX.invertedSugar,
 		mix,
 	);
+	const fromLemon = pacPoints(opts.lemonJuice ?? 0, PAC_INDEX.lemonJuice, mix);
 	const abv = opts.abvPercent ?? 0;
 	const fromAlcohol = alcoholPacPoints(opts.alcoholGrams ?? 0, abv, mix);
 	const sugarPac = fromSucrose + fromDextrose + fromHoney + fromInverted;
-	const total = round(sugarPac + fromAlcohol, 1);
+	const total = round(sugarPac + fromLemon + fromAlcohol, 1);
 	const sugarMargin = round(temp.pacTarget - sugarPac, 1);
 	const remaining = round(temp.pacTarget - total, 1);
 
@@ -127,6 +133,7 @@ export function computePacBalance(opts: {
 		fromDextrose,
 		fromHoney,
 		fromInverted,
+		fromLemon,
 		fromAlcohol,
 		total,
 		margin: sugarMargin,
@@ -153,6 +160,8 @@ export type RecipeInput = {
 	extraPannaGrams?: number;
 	/** Extra water beyond the formula amount (displaces milk when liquid is milk). */
 	extraWaterGrams?: number;
+	/** Extra lemon juice beyond formula (displaces milk/water; xanthan scales with lemon %). */
+	extraLemonGrams?: number;
 };
 
 export type RecipeIngredients = {
@@ -208,6 +217,8 @@ export type RecipeResult = {
 	/** Percents of final mix for the three watch ingredients. */
 	percents: { panna: number; alcohol: number; water: number };
 	alerts: AdditiveAlert[];
+	/** Process / balancing tips (lemon cold-add, stabilizer bump, …). */
+	tips: string[];
 	pac: PacBalance;
 	/** Perceived sweetness % of mix. */
 	pod: number;
@@ -372,10 +383,19 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 	const honey = mode.useHoney && !preferSucrose ? scaled.highPac : 0;
 
 	const formulaPanna = targetTotal * params.pannaFactor;
-	const lemonJuice = targetTotal * params.lemonPerKg;
+	const extraLemon = Math.max(0, input.extraLemonGrams ?? 0);
+	const lemonJuice = targetTotal * params.lemonPerKg + extraLemon;
+	const lemonPercent = targetTotal > 0 ? (lemonJuice / targetTotal) * 100 : 0;
+	const lemonXanthanSteps = Math.floor(
+		lemonPercent / LEMON_MIX_TWEAKS.lemonPercentPerStep,
+	);
+	const lemonXanthanBump =
+		lemonXanthanSteps * LEMON_MIX_TWEAKS.stabilizerBumpPerStep;
+	const alcoholXanthanBump =
+		alcohol > 0 ? ALCOHOL_MIX_TWEAKS.stabilizerBump : 0;
 	let xanthan = targetTotal * params.xanthanFactor;
-	if (alcohol > 0) {
-		xanthan *= 1 + ALCOHOL_MIX_TWEAKS.stabilizerBump;
+	if (alcoholXanthanBump + lemonXanthanBump > 0) {
+		xanthan *= 1 + alcoholXanthanBump + lemonXanthanBump;
 	}
 	const salt = targetTotal * 0.0005; // 0.5 g/kg
 	const extraPanna = Math.max(0, input.extraPannaGrams ?? 0);
@@ -436,6 +456,18 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		severity: severity(percent, thresholds),
 	}));
 
+	const tips: string[] = [];
+	if (lemonXanthanSteps > 0) {
+		tips.push(
+			`Xantano +${lemonXanthanBump * 100}%: limone ≈ ${round(lemonPercent, 1)}% della miscela (${lemonXanthanSteps}× ogni ${LEMON_MIX_TWEAKS.lemonPercentPerStep}% → +${LEMON_MIX_TWEAKS.stabilizerBumpPerStep * 100}%).`,
+		);
+	}
+	if (ingredients.lemonJuice > 0 && params.liquid === "milk") {
+		tips.push(
+			"Aggiungi il succo di limone solo a freddo (≤ 2–4°C), preferibilmente in mantecatura a miscela già maturata — a pH < 5 la caseina precipita (taglio del latte).",
+		);
+	}
+
 	const pac = computePacBalance({
 		tempKey,
 		mixGrams: actualTotal,
@@ -443,6 +475,7 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		dextrose: ingredients.dextrose,
 		honey: ingredients.honey,
 		invertedSugar: ingredients.invertedSugar,
+		lemonJuice: ingredients.lemonJuice,
 		alcoholGrams: ingredients.alcohol,
 		abvPercent: abv,
 	});
@@ -452,6 +485,7 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		dextrose: ingredients.dextrose,
 		honey: ingredients.honey,
 		invertedSugar: ingredients.invertedSugar,
+		lemonJuice: ingredients.lemonJuice,
 	});
 
 	const sucroseAdvisory = mode.sucroseOnly
@@ -471,6 +505,7 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		ingredients,
 		percents,
 		alerts,
+		tips,
 		pac,
 		pod,
 		sucroseAdvisory,

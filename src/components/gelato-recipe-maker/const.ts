@@ -74,6 +74,8 @@ export const PAC_INDEX = {
 	/** Atomized glucose 21 DE — solids without PAC. */
 	glucoseAtomized21DE: 0,
 	lactose: 100,
+	/** Lemon juice ≈ 5% natural sugars; 100 g → 5 PAC on a 1 kg mix. */
+	lemonJuice: 5,
 } as const;
 
 /** Relative POD (sweetening power); sucrose = 100. */
@@ -84,6 +86,8 @@ export const POD_INDEX = {
 	/** Honey ≈ invert sugar sweetness. */
 	honey: 130,
 	lactose: 16,
+	/** Lemon juice: 100 g → 5 POD on a 1 kg mix. */
+	lemonJuice: 5,
 } as const;
 
 /**
@@ -189,12 +193,36 @@ export const ALCOHOL_PAC_PER_PURE_GRAM = 9;
 
 /** Recipe tweaks when alcohol is in the mix (casein is advice only — not auto-dosed). */
 export const ALCOHOL_MIX_TWEAKS = {
-	/** Suggested pure casein if using alcohol — show as tip, not an ingredient line. */
-	caseinGramsPerKg: 20,
 	/** Increase neutro/stabilizer vs normal dose. */
 	stabilizerBump: 0.25,
 	/** Prefer sucrose (PAC 100); avoid high-PAC sugars (dextrose, invert). */
 	preferSucrose: true,
+} as const;
+
+/**
+ * Pure casein (sodium caseinate spray) — advice only, not an ingredient line.
+ * Toggle defaults on with alcohol; chocolate tip lives on flavor rows.
+ */
+export const CASEIN_ADVICE = {
+	gramsPerKg: 20,
+	alcoholTip:
+		"L'alcol disattiva le proteine e ostacola l'overrun; la caseina (caseinati sodici spray) compensa, trattiene l'alcol e mantiene la struttura sollevata.",
+	chocolateTip:
+		"Consiglio caseina (~20 g/kg): il cacao apporta molti solidi; alleggerisce la struttura e facilita l'aria.",
+	acidWarning:
+		"La caseina precipita sotto pH 5 (o 4,5). Con frutta acida/agrumi: aggiungi la parte acida solo a freddo o in mantecatura.",
+} as const;
+
+/**
+ * Lemon juice: displaces milk/water, tiny PAC/POD, acids cut stabilizer power.
+ * Add cold (≤ 2–4°C) on milk mixes — casein precipitates below pH 5 when warm.
+ */
+export const LEMON_MIX_TWEAKS = {
+	/** +25% xanthan for each 2.5% of mix that is lemon juice. */
+	stabilizerBumpPerStep: 0.25,
+	lemonPercentPerStep: 2.5,
+	/** Typical dose when a sweet-fruit recipe calls for lemon (g/kg). */
+	typicalGramsPerKg: 35,
 } as const;
 
 /**
@@ -336,12 +364,12 @@ export const FLAVOR_ROWS: {
 	{
 		key: "cocoaPowder_22_24",
 		label: "Cacao in polvere 22/24",
-		note: "Sostituisci lo stesso peso di latte",
+		note: `Sostituisci lo stesso peso di latte. ${CASEIN_ADVICE.chocolateTip}`,
 	},
 	{
 		key: "chocolateCouverture70",
 		label: "Cioccolato couverture 70%",
-		note: "Alto grasso — spesso riduci panna/latte e usa acqua",
+		note: `Alto grasso — spesso riduci panna/latte e usa acqua. ${CASEIN_ADVICE.chocolateTip}`,
 	},
 	{
 		key: "stracciatella",
