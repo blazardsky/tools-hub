@@ -2,14 +2,14 @@
 import App from "@components/gelato-recipe-maker/App";
 import ToolLayout from "@layouts/ToolLayout.astro";
 
-const title = "Gelato Recipe Maker";
+const title = "Creatore Ricette Gelato";
 ---
 
 <ToolLayout
   title={title}
-  description="Generate balanced gelato and sorbet quantities in grams."
+  description="Genera quantità bilanciate di gelato e sorbetto in grammi."
 >
   <h1>{title}</h1>
-  <p>Balance a mix from fruit weight (or total for base bianca), with optional extras.</p>
+  <p>Bilancia una miscela dal peso della frutta (o dal totale per la base bianca), con additivi opzionali.</p>
   <App client:load />
 </ToolLayout>

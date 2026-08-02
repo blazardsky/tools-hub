@@ -53,12 +53,12 @@ export const SERVICE_TEMP = {
 	professional: {
 		celsius: -12 as const,
 		pacTarget: 270,
-		label: "Professional (−12°C)",
+		label: "Professionale (−12°C)",
 	},
 	home: {
 		celsius: -18 as const,
 		pacTarget: 410,
-		label: "Home freezer (−18°C)",
+		label: "Freezer di casa (−18°C)",
 	},
 } as const;
 
@@ -92,35 +92,35 @@ export const POD_INDEX = {
  */
 export const SUGAR_MODES = {
 	blend: {
-		label: "Sucrose + dextrose (recommended)",
+		label: "Saccarosio + destrosio (consigliato)",
 		sucroseOnly: false,
 		useHoney: false,
 		useInvert: false,
-		hint: "Dextrose PAC 190 / POD 70 — raises freeze resistance without cloying sweetness.",
+		hint: "Destrosio PAC 190 / POD 70 — alza la resistenza al gelo senza dolcezza stucchevole.",
 	},
 	inverted: {
-		label: "Sucrose + inverted sugar",
+		label: "Saccarosio + zucchero invertito",
 		sucroseOnly: false,
 		useHoney: false,
 		useInvert: true,
-		hint: "Invert PAC 190 / POD 130 — softer scoop than sucrose alone; still sweeter than dextrose.",
+		hint: "Invertito PAC 190 / POD 130 — scoop più morbido del solo saccarosio; più dolce del destrosio.",
 	},
 	honey: {
-		label: "Sucrose + honey",
+		label: "Saccarosio + miele",
 		sucroseOnly: false,
 		useHoney: true,
 		useInvert: false,
-		hint: "Honey ≈ invert (PAC 190 / POD 130). Prefer acacia for a milder flavour.",
+		hint: "Miele ≈ invertito (PAC 190 / POD 130). Preferisci acacia per un sapore più delicato.",
 	},
 	common: {
-		label: "Common sugar only (sucrose)",
+		label: "Solo zucchero comune (saccarosio)",
 		sucroseOnly: true,
 		useHoney: false,
 		useInvert: false,
 		/** Creams 17–18%; sorbets 22–24% — edible sweetness, not full −18°C PAC. */
 		creamSugarFactor: 0.175,
 		sorbetSugarFactor: 0.23,
-		hint: "PAC:POD = 1:1 — cannot hit freezer PAC without tasting sickly. Prefer dextrose, invert, or alcohol.",
+		hint: "PAC:POD = 1:1 — non si raggiunge il PAC del freezer senza un gusto stucchevole. Preferisci destrosio, invertito o alcol.",
 	},
 } as const;
 
@@ -129,53 +129,53 @@ export type SugarMode = keyof typeof SUGAR_MODES;
 /** DIY invert-sugar procedure (shown when sucrose-only or invert mode). */
 export const INVERT_SUGAR_HOWTO = {
 	summary:
-		"Invert sugar splits sucrose into glucose + fructose: PAC 190 (vs 100) and blocks crystallization.",
+		"Lo zucchero invertito spezza il saccarosio in glucosio + fruttosio: PAC 190 (vs 100) e blocca la cristallizzazione.",
 	steps: [
-		"Dissolve sucrose in water and heat with a little acid (citric acid, cream of tartar, or lemon juice).",
-		"Acid + heat cleaves sucrose into glucose and fructose.",
-		"Simple formula: heat a sugar–water solution to 80°C with a pinch of citric acid; ~30 min → >90% inversion, fine for home use.",
+		"Sciogli il saccarosio in acqua e scalda con un po' di acido (acido citrico, cremor tartaro o succo di limone).",
+		"Acido + calore spezzano il saccarosio in glucosio e fruttosio.",
+		"Formula semplice: scalda una soluzione zucchero–acqua a 80°C con un pizzico di acido citrico; ~30 min → >90% di inversione, ok per uso domestico.",
 	],
 } as const;
 
 /** Mix / pasteurization / maturation procedure (shown below PAC balance). */
 export const MIX_PROCEDURE = {
-	title: "Mix procedure",
+	title: "Procedura di miscelazione",
 	stages: [
 		{
-			title: "1. Mixing order",
+			title: "1. Ordine di miscelazione",
 			points: [
-				"Cold liquids first: pour milk and panna.",
-				"Rain in powders (sugars, milk powder) while still cold; agitate hard to avoid lumps.",
-				"Stabilizer (neutro / xanthan): blend with a little sugar and add around 40°C so it disperses instead of floating on steam.",
+				"Prima i liquidi freddi: versa latte e panna.",
+				"Incorpora le polveri (zuccheri, latte in polvere) ancora a freddo; agita con forza per evitare grumi.",
+				"Stabilizzante (neutro / xantano): mescola con un po' di zucchero e aggiungi intorno ai 40°C così si disperde invece di galleggiare sul vapore.",
 			],
 		},
 		{
-			title: "2. Heat to 85°C (high pasteurization)",
+			title: "2. Riscaldare a 85°C (pastorizzazione alta)",
 			points: [
-				"Bring the mix to 85°C; start cooling immediately or after a few seconds (no long hold).",
-				"Not only sanitation: activates neutri/stabilizers (best hydration above ~80–82°C), emulsifies fats, dissolves sugars evenly, and hydrates milk proteins so they bind free water.",
+				"Porta la miscela a 85°C; inizia a raffreddare subito o dopo pochi secondi (niente sosta lunga).",
+				"Non solo sanificazione: attiva neutri/stabilizzanti (idratazione ottimale sopra ~80–82°C), emulsiona i grassi, scioglie gli zuccheri in modo uniforme e idrata le proteine del latte così legano l'acqua libera.",
 			],
 		},
 		{
-			title: "3. Rapid cool 85°C → 4°C",
+			title: "3. Raffreddamento rapido 85°C → 4°C",
 			points: [
-				"Cool as fast as possible — ideally under 1 hour (heating + cooling together under ~2 hours).",
-				"45°C → 15°C is the critical bacterial window; pass it as quickly as you can.",
+				"Raffredda il più in fretta possibile — idealmente sotto 1 ora (riscaldamento + raffreddamento insieme sotto ~2 ore).",
+				"45°C → 15°C è la finestra batterica critica; attraversala il più in fretta possibile.",
 			],
 		},
 		{
-			title: "4. Maturation (6–12 h at 4°C)",
+			title: "4. Maturazione (6–12 h a 4°C)",
 			points: [
-				"Rest in the fridge 6–12 hours (some texts allow up to 14).",
-				"Fats crystallize, proteins finish hydrating, stabilizers bind free water → creamier scoop, fewer large ice crystals, better overrun.",
+				"Riposa in frigo 6–12 ore (alcuni testi arrivano fino a 14).",
+				"I grassi cristallizzano, le proteine finiscono di idratarsi, gli stabilizzanti legano l'acqua libera → scoop più cremoso, meno cristalli di ghiaccio grandi, overrun migliore.",
 			],
 		},
 		{
-			title: "5. Churn & fruit timing",
+			title: "5. Mantecazione e timing della frutta",
 			points: [
-				"Load the mantecatore at ≤ 4°C so you keep the air built during maturation.",
-				"Acid fruit (pH < 5): add at the end, preferably in the churn when the base is under ~2°C — cold stops casein precipitation (“cutting”).",
-				"Browning fruit (banana, peach): fold in last and churn immediately to keep colour.",
+				"Carica il mantecatore a ≤ 4°C così conservi l'aria costruita in maturazione.",
+				"Frutta acida (pH < 5): aggiungi alla fine, preferibilmente in mantecatura quando la base è sotto ~2°C — il freddo ferma la precipitazione della caseina («taglio»).",
+				"Frutta che imbrunisce (banana, pesca): incorpora per ultima e manteca subito per mantenere il colore.",
 			],
 		},
 	],
@@ -273,39 +273,39 @@ export const KIND_OPTIONS: {
 }[] = [
 	{
 		value: "fruit_acid",
-		label: "Acid fruit (pH < 5)",
-		hint: "Plums, strawberries, berries — fruit in churn when mix is cold",
+		label: "Frutta acida (pH < 5)",
+		hint: "Susine, fragole, frutti di bosco — frutta in mantecatura a miscela fredda",
 	},
 	{
 		value: "fruit_sweet",
-		label: "Sweet fruit (pH > 5)",
-		hint: "Banana, mango, figs — blend fruit with base before churning",
+		label: "Frutta dolce (pH > 5)",
+		hint: "Banana, mango, fichi — mischia la frutta con la base prima di mantecare",
 	},
 	{
 		value: "cream",
-		label: "Base bianca (cream)",
-		hint: "No fruit — set desired mix weight",
+		label: "Base bianca (crema)",
+		hint: "Senza frutta — imposta il peso desiderato della miscela",
 	},
 	{
 		value: "sorbet",
-		label: "Sorbet",
-		hint: "Fruit + water base, higher sugars",
+		label: "Sorbetto",
+		hint: "Base frutta + acqua, zuccheri più alti",
 	},
 ];
 
 export const INGREDIENT_ROWS = [
-	{ key: "fruit", label: "Fruit" },
-	{ key: "milk", label: "Milk" },
-	{ key: "sucrose", label: "Sucrose" },
-	{ key: "dextrose", label: "Dextrose" },
-	{ key: "invertedSugar", label: "Inverted sugar" },
-	{ key: "honey", label: "Honey" },
+	{ key: "fruit", label: "Frutta" },
+	{ key: "milk", label: "Latte" },
+	{ key: "sucrose", label: "Saccarosio" },
+	{ key: "dextrose", label: "Destrosio" },
+	{ key: "invertedSugar", label: "Zucchero invertito" },
+	{ key: "honey", label: "Miele" },
 	{ key: "panna", label: "Panna (35%)" },
-	{ key: "water", label: "Water" },
-	{ key: "lemonJuice", label: "Lemon juice" },
-	{ key: "xanthan", label: "Xanthan" },
-	{ key: "salt", label: "Salt" },
-	{ key: "alcohol", label: "Alcohol" },
+	{ key: "water", label: "Acqua" },
+	{ key: "lemonJuice", label: "Succo di limone" },
+	{ key: "xanthan", label: "Xantano" },
+	{ key: "salt", label: "Sale" },
+	{ key: "alcohol", label: "Alcol" },
 ] as const;
 
 export const FLAVOR_ROWS: {
@@ -315,63 +315,63 @@ export const FLAVOR_ROWS: {
 }[] = [
 	{
 		key: "coffeeFreezeDried",
-		label: "Coffee (freeze-dried)",
-		note: "Add while heating; subtract same weight from milk",
+		label: "Caffè (liofilizzato)",
+		note: "Aggiungi in riscaldamento; sottrai lo stesso peso dal latte",
 	},
 	{
 		key: "espresso",
 		label: "Espresso",
-		note: "Replace equal milk weight",
+		note: "Sostituisci lo stesso peso di latte",
 	},
 	{
 		key: "vanillaPods",
-		label: "Vanilla pods",
-		note: "Split & scrape; steep while heating, strain after maturation",
+		label: "Baccelli di vaniglia",
+		note: "Apri e raschia; infondi in riscaldamento, filtra dopo la maturazione",
 	},
 	{
 		key: "spices",
-		label: "Spices (e.g. cinnamon)",
-		note: "Infuse sticks in hot milk",
+		label: "Spezie (es. cannella)",
+		note: "Infondi i bastoncini nel latte caldo",
 	},
 	{
 		key: "cocoaPowder_22_24",
-		label: "Cocoa powder 22/24",
-		note: "Replace equal milk weight",
+		label: "Cacao in polvere 22/24",
+		note: "Sostituisci lo stesso peso di latte",
 	},
 	{
 		key: "chocolateCouverture70",
-		label: "Chocolate couverture 70%",
-		note: "High fat — often drop panna/milk and use water",
+		label: "Cioccolato couverture 70%",
+		note: "Alto grasso — spesso riduci panna/latte e usa acqua",
 	},
 	{
 		key: "stracciatella",
 		label: "Stracciatella",
-		note: "Add at end of churn (melted stream or chips)",
+		note: "Aggiungi a fine mantecatura (filo fuso o scaglie)",
 	},
 	{
 		key: "nuts",
-		label: "Nuts (chopped / candied)",
-		note: "Fold in during churn",
+		label: "Frutta secca (trita / candita)",
+		note: "Incorpora durante la mantecatura",
 	},
 	{
 		key: "candiedFruit",
-		label: "Candied fruit",
-		note: "Add in churn; consider sugar cut below",
+		label: "Frutta candita",
+		note: "Aggiungi in mantecatura; valuta la riduzione zuccheri sotto",
 	},
 	{
 		key: "eggYolk",
-		label: "Egg yolk (base uova)",
-		note: "Turns base bianca into mantecato; replace milk",
+		label: "Tuorlo d'uovo (base uova)",
+		note: "Trasforma la base bianca in mantecato; sostituisci il latte",
 	},
 	{
 		key: "catalanaCaramel",
-		label: "Crema catalana caramel",
-		note: "On egg base; add pieces at end of churn",
+		label: "Caramello crema catalana",
+		note: "Su base uova; aggiungi pezzi a fine mantecatura",
 	},
 	{
 		key: "sugaryInclusionSugarCut",
-		label: "Sugar cut (sugary inclusions)",
-		note: "Reduce base sugars when using candied / raisins / caramel",
+		label: "Riduzione zuccheri (inclusioni dolci)",
+		note: "Riduci gli zuccheri di base con canditi / uvetta / caramello",
 	},
 ];
 
