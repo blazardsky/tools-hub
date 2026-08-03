@@ -22,6 +22,7 @@ import {
 	type ServiceTempKey,
 	SUGAR_MODES,
 	type SugarMode,
+	saltGramsPerKg,
 	TARGETS,
 } from "./const";
 import { doseFor, generateRecipe, type RecipeResult } from "./lib";
@@ -119,6 +120,8 @@ export default function App() {
 	const [extraLemonGrams, setExtraLemonGrams] = useState("");
 	const [addEggYolk, setAddEggYolk] = useState(false);
 	const [eggYolkGrams, setEggYolkGrams] = useState("");
+	const [savory, setSavory] = useState(false);
+	const [saltGrams, setSaltGrams] = useState("");
 
 	const isCream = kind === "cream";
 	const kindMeta = KIND_OPTIONS.find((o) => o.value === kind);
@@ -141,6 +144,8 @@ export default function App() {
 				extraWaterGrams: addWater ? parseGrams(extraWaterGrams) : 0,
 				extraLemonGrams: addLemon ? parseGrams(extraLemonGrams) : 0,
 				eggYolkGrams: addEggYolk ? parseGrams(eggYolkGrams) : 0,
+				savory,
+				saltGrams: savory ? parseGrams(saltGrams) : undefined,
 			});
 		} catch {
 			return null;
@@ -163,6 +168,8 @@ export default function App() {
 		extraLemonGrams,
 		addEggYolk,
 		eggYolkGrams,
+		savory,
+		saltGrams,
 	]);
 
 	const pac = result?.pac ?? null;
@@ -189,6 +196,8 @@ export default function App() {
 		setExtraLemonGrams("");
 		setAddEggYolk(false);
 		setEggYolkGrams("");
+		setSavory(false);
+		setSaltGrams("");
 	};
 
 	return (
@@ -202,8 +211,7 @@ export default function App() {
 								key={opt.value}
 								className={cn(
 									"flex cursor-pointer gap-2 border border-border px-3 py-2",
-									kind === opt.value &&
-										"border-primary bg-muted",
+									kind === opt.value && "border-primary bg-muted",
 								)}
 							>
 								<input
@@ -211,7 +219,22 @@ export default function App() {
 									name="kind"
 									value={opt.value}
 									checked={kind === opt.value}
-									onChange={() => setKind(opt.value)}
+									onChange={() => {
+										setKind(opt.value);
+										if (savory) {
+											const mix =
+												opt.value === "cream"
+													? parseGrams(totalGrams) || 1000
+													: parseGrams(fruitGrams) * FRUIT_TO_TOTAL || 1000;
+											setSaltGrams(
+												String(
+													Math.round(
+														doseFor(saltGramsPerKg(true, opt.value), mix) * 10,
+													) / 10,
+												),
+											);
+										}
+									}}
 									className="mt-1"
 								/>
 								<span>
@@ -235,6 +258,93 @@ export default function App() {
 								: null}
 						</p>
 					) : null}
+				</fieldset>
+
+				<fieldset className="space-y-3">
+					<legend className={labelClass}>Profilo sale</legend>
+					<div className="grid gap-2 sm:grid-cols-2">
+						<label
+							className={cn(
+								"flex cursor-pointer gap-2 border border-border px-3 py-2",
+								!savory && "border-primary bg-muted",
+							)}
+						>
+							<input
+								type="radio"
+								name="savory"
+								checked={!savory}
+								onChange={() => {
+									setSavory(false);
+									setSaltGrams("");
+								}}
+								className="mt-1"
+							/>
+							<span>
+								<span className="block text-sm font-medium text-foreground">
+									Dolce (tradizionale)
+								</span>
+								<span className="block text-sm text-muted-foreground">
+									Sale ~{INGREDIENT_DATA.salt.formula.gramsPerKgSweet} g/kg come
+									esaltatore (non in tabelle professionali)
+								</span>
+							</span>
+						</label>
+						<label
+							className={cn(
+								"flex cursor-pointer gap-2 border border-border px-3 py-2",
+								savory && "border-primary bg-muted",
+							)}
+						>
+							<input
+								type="radio"
+								name="savory"
+								checked={savory}
+								onChange={() => {
+									setSavory(true);
+									const mix = isCream
+										? parseGrams(totalGrams) || 1000
+										: parseGrams(fruitGrams) * FRUIT_TO_TOTAL || 1000;
+									setSaltGrams(
+										String(
+											Math.round(
+												doseFor(saltGramsPerKg(true, kind), mix) * 10,
+											) / 10,
+										),
+									);
+								}}
+								className="mt-1"
+							/>
+							<span>
+								<span className="block text-sm font-medium text-foreground">
+									Salato (gastronomico)
+								</span>
+								<span className="block text-sm text-muted-foreground">
+									Creme 4–8 g/kg · sorbetti tipicamente 8 g/kg — funzionale su
+									PAC e struttura
+								</span>
+							</span>
+						</label>
+					</div>
+					{savory ? (
+						<NumberField
+							id="saltGrams"
+							label="Sale"
+							value={saltGrams}
+							onChange={setSaltGrams}
+							step={0.1}
+							hint={
+								kind === "sorbet"
+									? `Tipico ${INGREDIENT_DATA.salt.formula.gramsPerKgSavorySorbet} g/kg · PAC 100 (= saccarosio)`
+									: `Range ${INGREDIENT_DATA.salt.formula.gramsPerKgSavoryCreamMin}–${INGREDIENT_DATA.salt.formula.gramsPerKgSavoryCreamMax} g/kg (es. 4 g Parmigiano/Gorgonzola, fino a 8 g Emmental/caviale) · PAC 100`
+							}
+						/>
+					) : (
+						<p className="text-sm text-muted-foreground">
+							Il latte porta già ~10 g/L di sali minerali. Acidità della frutta
+							non cambia il sale — solo neutro (+25% se acido) e acidi a freddo
+							con latte.
+						</p>
+					)}
 				</fieldset>
 
 				{isCream ? (
@@ -272,8 +382,7 @@ export default function App() {
 								key={key}
 								className={cn(
 									"flex cursor-pointer gap-2 border border-border px-3 py-2",
-									tempKey === key &&
-										"border-primary bg-muted",
+									tempKey === key && "border-primary bg-muted",
 								)}
 							>
 								<input
@@ -371,8 +480,7 @@ export default function App() {
 								key={key}
 								className={cn(
 									"flex cursor-pointer gap-2 border border-border px-3 py-2",
-									sugarMode === key &&
-										"border-primary bg-muted",
+									sugarMode === key && "border-primary bg-muted",
 								)}
 							>
 								<input
@@ -437,9 +545,7 @@ export default function App() {
 									preparalo in casa:
 								</li>
 								<li>
-									<strong className="font-medium text-foreground">
-										Alcol
-									</strong>
+									<strong className="font-medium text-foreground">Alcol</strong>
 									: +{result.sucroseAdvisory.alcoholToCloseG} g al{" "}
 									{alcoholAbv || 40}% vol chiude il gap di PAC senza aggiungere
 									dolcezza (regola: 1% alcol puro / kg ≈ 9 PAC). Attiva Aggiungi
@@ -481,20 +587,14 @@ export default function App() {
 				<fieldset className="space-y-4">
 					<legend className={labelClass}>Additivi opzionali</legend>
 					<p className="text-sm text-muted-foreground">
-						Panna/acqua/limone/tuorlo spostano latte (o acqua). L'alcol sposta
-						liquido e ribilancia gli zuccheri (preferisci saccarosio). Il neutro
-						è auto-dosato per famiglia (
-						{INGREDIENT_DATA.neutro.formula.gramsPerKgByKind.cream}/
-						{INGREDIENT_DATA.neutro.formula.gramsPerKgByKind.fruit}/
-						{INGREDIENT_DATA.neutro.formula.gramsPerKgByKind.sorbet} g/kg);
-						acido (fruit_acid o limone) ×
-						{1 + INGREDIENT_DATA.neutro.formula.acidBump}; alcol su crema/frutta
-						→ {INGREDIENT_DATA.neutro.formula.alcoholCreamGramsPerKg} g/kg, su
-						sorbetto ×{1 + INGREDIENT_DATA.neutro.formula.alcoholSorbetBump}. Il
-						tuorlo lo riduce (~
-						{INGREDIENT_DATA.eggYolk.formula.neutroEquivalentPerYolkGrams}{" "}
-						g/tuorlo). Il limone va aggiunto a freddo se c'è latte. Con alcol si
-						consiglia caseina pura (disattivabile).
+						Servono quando vuoi spingere gusto o texture oltre la base
+						bilanciata: panna per più cremosità e grasso, acqua per alleggerire
+						i solidi, limone per acidità e freschezza, tuorlo per emulsionare
+						(legare grassi e acqua), alcol per aroma e per ammorbidire a
+						servizio. Ogni aggiunta sposta latte o acqua nella ricetta; alcol e
+						limone alzano anche il neutro, il tuorlo lo riduce. Con limone e
+						latte aggiungi il succo a freddo; con alcol conviene un po' di
+						caseina (opzionale) e preferisci saccarosio tra gli zuccheri.
 					</p>
 
 					<div className="space-y-3">
@@ -668,9 +768,7 @@ export default function App() {
 			</form>
 
 			<section aria-live="polite" className="space-y-3">
-				<h2 className="text-xl font-semibold text-foreground">
-					Ricetta
-				</h2>
+				<h2 className="text-xl font-semibold text-foreground">Ricetta</h2>
 				{!result ? (
 					<p className="text-muted-foreground">
 						Inserisci un peso di {isCream ? "miscela" : "frutta"} per generare
@@ -692,10 +790,7 @@ export default function App() {
 								{INGREDIENT_ROWS.filter(
 									({ key }) => result.ingredients[key] > 0,
 								).map(({ key, label }) => (
-									<tr
-										key={key}
-										className="border-b border-border"
-									>
+									<tr key={key} className="border-b border-border">
 										<td className="py-2 pr-4">{label}</td>
 										<td className="py-2 tabular-nums">
 											{result.ingredients[key]}
@@ -750,9 +845,7 @@ export default function App() {
 									{CASEIN_ADVICE.alcoholTip}
 								</p>
 								{kind === "fruit_acid" || result.ingredients.lemonJuice > 0 ? (
-									<p className="text-primary">
-										{CASEIN_ADVICE.acidWarning}
-									</p>
+									<p className="text-primary">{CASEIN_ADVICE.acidWarning}</p>
 								) : null}
 							</div>
 						) : null}
@@ -780,6 +873,7 @@ export default function App() {
 										{pac.fromHoney > 0 ? ` + ${pac.fromHoney} (miele)` : ""}
 									</li>
 									{pac.fromLemon > 0 ? <li>Limone: {pac.fromLemon}</li> : null}
+									{pac.fromSalt > 0 ? <li>Sale: {pac.fromSalt}</li> : null}
 									<li>Alcol: {pac.fromAlcohol}</li>
 									<li>
 										Totale: {pac.total}
@@ -870,10 +964,7 @@ export default function App() {
 										? " · −latte"
 										: "";
 								return (
-									<tr
-										key={key}
-										className="border-b border-border align-top"
-									>
+									<tr key={key} className="border-b border-border align-top">
 										<td className="py-2 pr-4">{label}</td>
 										<td className="py-2 pr-4 whitespace-nowrap tabular-nums">
 											{flavorDoseLabel(key, mixForFlavors)}

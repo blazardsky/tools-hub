@@ -14,6 +14,7 @@ import {
 	type ServiceTempKey,
 	SUGAR_MODES,
 	type SugarMode,
+	saltGramsPerKg,
 } from "./const";
 
 /** Scale a per-kg dose to an arbitrary mix weight. */
@@ -86,6 +87,7 @@ export type PacBalance = {
 	fromHoney: number;
 	fromInverted: number;
 	fromLemon: number;
+	fromSalt: number;
 	fromAlcohol: number;
 	total: number;
 	/** Target − sugar PAC (room reserved / available before counting alcohol). */
@@ -104,6 +106,7 @@ export function computePacBalance(opts: {
 	honey?: number;
 	invertedSugar?: number;
 	lemonJuice?: number;
+	salt?: number;
 	alcoholGrams?: number;
 	abvPercent?: number;
 }): PacBalance {
@@ -118,10 +121,11 @@ export function computePacBalance(opts: {
 		mix,
 	);
 	const fromLemon = pacPoints(opts.lemonJuice ?? 0, PAC_INDEX.lemonJuice, mix);
+	const fromSalt = pacPoints(opts.salt ?? 0, PAC_INDEX.salt, mix);
 	const abv = opts.abvPercent ?? 0;
 	const fromAlcohol = alcoholPacPoints(opts.alcoholGrams ?? 0, abv, mix);
 	const sugarPac = fromSucrose + fromDextrose + fromHoney + fromInverted;
-	const total = round(sugarPac + fromLemon + fromAlcohol, 1);
+	const total = round(sugarPac + fromLemon + fromSalt + fromAlcohol, 1);
 	const sugarMargin = round(temp.pacTarget - sugarPac, 1);
 	const remaining = round(temp.pacTarget - total, 1);
 
@@ -134,6 +138,7 @@ export function computePacBalance(opts: {
 		fromHoney,
 		fromInverted,
 		fromLemon,
+		fromSalt,
 		fromAlcohol,
 		total,
 		margin: sugarMargin,
@@ -164,6 +169,10 @@ export type RecipeInput = {
 	extraLemonGrams?: number;
 	/** Egg yolk as emulsifier/neutro (displaces milk/water; reduces neutro dose). */
 	eggYolkGrams?: number;
+	/** Savory / gastronomic — higher salt dose (4–8 g/kg cream, 8 g/kg sorbet). */
+	savory?: boolean;
+	/** Absolute salt grams when savory (optional; otherwise formula default for kind). */
+	saltGrams?: number;
 };
 
 export type RecipeIngredients = {
@@ -338,7 +347,15 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 	const alcohol = Math.max(0, input.alcoholGrams ?? 0);
 	const abv = Math.max(0, input.alcoholAbv ?? 0);
 	const alcoholPac = alcoholPacPoints(alcohol, abv, targetTotal);
-	const desiredSugarPac = Math.max(0, pacTarget - alcoholPac);
+	const savory = input.savory ?? false;
+	const saltDefaultKg = saltGramsPerKg(savory, input.kind);
+	const saltOverride = Math.max(0, input.saltGrams ?? 0);
+	const salt =
+		savory && saltOverride > 0
+			? saltOverride
+			: doseFor(saltDefaultKg, targetTotal);
+	const saltPac = pacPoints(salt, PAC_INDEX.salt, targetTotal);
+	const desiredSugarPac = Math.max(0, pacTarget - alcoholPac - saltPac);
 	// With alcohol: avoid high-PAC sugars (dextrose/invert/honey) — prefer sucrose.
 	const preferSucrose = alcohol > 0 && ALCOHOL_MIX_TWEAKS.preferSucrose;
 	const share = mode.sucroseOnly || preferSucrose ? 1 : sucroseShare;
@@ -412,7 +429,6 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		INGREDIENT_DATA.eggYolk.formula.neutroEquivalentPerYolkGrams;
 	const neutro = Math.max(0, (neutroPerKg * targetTotal) / 1000 - yolkNeutroEq);
 
-	const salt = (targetTotal * INGREDIENT_DATA.salt.formula.gramsPerKg) / 1000;
 	const extraPanna = Math.max(0, input.extraPannaGrams ?? 0);
 	const extraWater = Math.max(0, input.extraWaterGrams ?? 0);
 
@@ -503,6 +519,15 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 			`Tuorlo: ≈ ${yolks} tuorli (≈ ${round(yolkNeutroEq, 1)} g neutro sostituiti). Coagula a ~65°C — non superare in pastorizzazione.`,
 		);
 	}
+	if (savory) {
+		const sf = INGREDIENT_DATA.salt.formula;
+		const perKg = round((salt * 1000) / targetTotal, 2);
+		tips.push(
+			input.kind === "sorbet"
+				? `Sale gastronomico: ${ingredients.salt} g (≈ ${perKg} g/kg; tipico ${sf.gramsPerKgSavorySorbet} g/kg). PAC 100 — riservato nel bilancio zuccheri.`
+				: `Sale gastronomico: ${ingredients.salt} g (≈ ${perKg} g/kg; range ${sf.gramsPerKgSavoryCreamMin}–${sf.gramsPerKgSavoryCreamMax} g/kg). PAC 100 — riservato nel bilancio zuccheri.`,
+		);
+	}
 
 	const pac = computePacBalance({
 		tempKey,
@@ -512,6 +537,7 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		honey: ingredients.honey,
 		invertedSugar: ingredients.invertedSugar,
 		lemonJuice: ingredients.lemonJuice,
+		salt: ingredients.salt,
 		alcoholGrams: ingredients.alcohol,
 		abvPercent: abv,
 	});

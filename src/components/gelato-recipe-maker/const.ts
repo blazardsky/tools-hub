@@ -430,11 +430,18 @@ export const INGREDIENT_DATA = {
 		pac: 100,
 		solidsPercent: 100,
 		notes:
-			"Minerale; abbassa il punto di congelamento (PAC 100). In formula il PAC non è ancora applicato al bilancio.",
+			"PAC 100 (= saccarosio): ogni grammo abbassa il punto di congelamento quanto 1 g di zucchero. Favorisce la coagulazione delle proteine e ne riduce la capacità di legare acqua (viscosità, soprattutto con tuorlo). Non aggiungere sale agli albumi in montatura. Il latte intero porta già ~10 g/L di sali minerali (sapore + overrun). Acidità frutta: nessun cambio di dose sale — solo neutro ×1,25 e acidi a freddo se c’è latte.",
 		dosage:
-			"Creme dolci: 0,5 g/kg in formula (pratica comune, non un valore «fisso» nelle fonti). Creme salate: 4–8 g/kg.",
+			"Dolce (crema/frutta/sorbetto): ~0,5 g/kg come esaltatore (non in tabelle professionali). Salato gastronomico — creme: 4–8 g/kg (es. 4 g Parmigiano/Gorgonzola, fino a 8 g Emmental/caviale); sorbetti: fino a 8 g/kg (es. pomodoro/carota 8 g/kg).",
 		formula: {
-			gramsPerKg: 0.5,
+			/** Sweet / tradizionale — common practice, not a table standard. */
+			gramsPerKgSweet: 0.5,
+			/** Default savory cream dose (range 4–8). */
+			gramsPerKgSavoryCream: 4,
+			gramsPerKgSavoryCreamMin: 4,
+			gramsPerKgSavoryCreamMax: 8,
+			/** Savory sorbet — sources cite 8 g/kg. */
+			gramsPerKgSavorySorbet: 8,
 		},
 	},
 	sorbitol: {
@@ -716,6 +723,13 @@ export const LACTOSE_FREE = {
 
 export type RecipeKind = "fruit_acid" | "fruit_sweet" | "cream" | "sorbet";
 
+/** Salt dose g/kg: sweet ~0.5; savory cream 4 (range 4–8); savory sorbet 8. */
+export function saltGramsPerKg(savory: boolean, kind: RecipeKind): number {
+	const f = INGREDIENT_DATA.salt.formula;
+	if (!savory) return f.gramsPerKgSweet;
+	return kind === "sorbet" ? f.gramsPerKgSavorySorbet : f.gramsPerKgSavoryCream;
+}
+
 type KindParams = {
 	sugarTotalFactor: number;
 	fruitSugarFactor: number;
@@ -874,5 +888,4 @@ export const FLAVOR_ROWS: {
 export const fieldClass =
 	"mt-1 w-full border border-border bg-background px-3 py-2 text-base text-foreground outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/25";
 
-export const labelClass =
-	"block text-sm font-medium text-foreground";
+export const labelClass = "block text-sm font-medium text-foreground";
