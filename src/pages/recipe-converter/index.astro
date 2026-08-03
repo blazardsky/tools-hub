@@ -1,6 +1,6 @@
 ---
-import ToolLayout from "@layouts/ToolLayout.astro";
 import App from "@components/recipe-converter/App";
+import ToolLayout from "@layouts/ToolLayout.astro";
 
 const title = "Recipe Converter";
 ---
@@ -10,5 +10,5 @@ const title = "Recipe Converter";
   description="Convert recipe quantities and units."
 >
   <h1>{title}</h1>
-  <App client:load label="Coming soon" />
+  <App client:load />
 </ToolLayout>
