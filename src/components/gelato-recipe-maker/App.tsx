@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
-	ALCOHOL_MIX_TWEAKS,
 	BASE_BIANCA_FLAVORS,
 	CASEIN_ADVICE,
 	FLAVOR_ROWS,
@@ -65,12 +64,12 @@ function NumberField({
 					onChange={(e) => onChange(e.target.value)}
 					className={cn(fieldClass, "pr-10", disabled && "opacity-50")}
 				/>
-				<span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-[rgb(var(--text-muted))]">
+				<span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted-foreground">
 					{suffix}
 				</span>
 			</div>
 			{hint ? (
-				<p className="mt-1 text-sm text-[rgb(var(--text-muted))]">{hint}</p>
+				<p className="mt-1 text-sm text-muted-foreground">{hint}</p>
 			) : null}
 		</div>
 	);
@@ -82,9 +81,9 @@ function parseGrams(raw: string): number {
 }
 
 function severityClass(severity: RecipeResult["alerts"][number]["severity"]) {
-	if (severity === "high") return "text-[rgb(var(--brand-dark))]";
-	if (severity === "warn") return "text-[rgb(var(--brand))]";
-	return "text-[rgb(var(--text-muted))]";
+	if (severity === "high") return "text-destructive";
+	if (severity === "warn") return "text-primary";
+	return "text-muted-foreground";
 }
 
 function flavorDoseLabel(
@@ -202,9 +201,9 @@ export default function App() {
 							<label
 								key={opt.value}
 								className={cn(
-									"flex cursor-pointer gap-2 border border-[rgb(var(--page-border))] px-3 py-2",
+									"flex cursor-pointer gap-2 border border-border px-3 py-2",
 									kind === opt.value &&
-										"border-[rgb(var(--brand))] bg-[rgb(var(--neutral-light))]",
+										"border-primary bg-muted",
 								)}
 							>
 								<input
@@ -216,10 +215,10 @@ export default function App() {
 									className="mt-1"
 								/>
 								<span>
-									<span className="block text-sm font-medium text-[rgb(var(--text-title))]">
+									<span className="block text-sm font-medium text-foreground">
 										{opt.label}
 									</span>
-									<span className="block text-sm text-[rgb(var(--text-muted))]">
+									<span className="block text-sm text-muted-foreground">
 										{opt.hint}
 									</span>
 								</span>
@@ -227,7 +226,7 @@ export default function App() {
 						))}
 					</div>
 					{kindMeta ? (
-						<p className="text-sm text-[rgb(var(--text-muted))]">
+						<p className="text-sm text-muted-foreground">
 							{isCream
 								? `Zuccheri ${TARGETS.sugarsCream.min}–${TARGETS.sugarsCream.max}% · grassi ${TARGETS.fatsCream.min}–${TARGETS.fatsCream.max}%`
 								: `Frutta tipicamente ${TARGETS.fruitPercent.min}–${TARGETS.fruitPercent.max}% della miscela (×${FRUIT_TO_TOTAL} dal peso frutta)`}
@@ -272,9 +271,9 @@ export default function App() {
 							<label
 								key={key}
 								className={cn(
-									"flex cursor-pointer gap-2 border border-[rgb(var(--page-border))] px-3 py-2",
+									"flex cursor-pointer gap-2 border border-border px-3 py-2",
 									tempKey === key &&
-										"border-[rgb(var(--brand))] bg-[rgb(var(--neutral-light))]",
+										"border-primary bg-muted",
 								)}
 							>
 								<input
@@ -286,10 +285,10 @@ export default function App() {
 									className="mt-1"
 								/>
 								<span>
-									<span className="block text-sm font-medium text-[rgb(var(--text-title))]">
+									<span className="block text-sm font-medium text-foreground">
 										{temp.label}
 									</span>
-									<span className="block text-sm text-[rgb(var(--text-muted))]">
+									<span className="block text-sm text-muted-foreground">
 										PAC target ≈ {temp.pacTarget}
 									</span>
 								</span>
@@ -297,19 +296,19 @@ export default function App() {
 						))}
 					</div>
 					{result ? (
-						<p className="text-sm text-[rgb(var(--text-muted))]">
+						<p className="text-sm text-muted-foreground">
 							{result.sugarMode === "common"
 								? "Dose di saccarosio edibile (non scalata al PAC pieno)"
 								: `Zuccheri scalati al PAC ${result.pac.target}`}
 							: saccarosio{" "}
-							<span className="tabular-nums text-[rgb(var(--text-title))]">
+							<span className="tabular-nums text-foreground">
 								{result.ingredients.sucrose} g
 							</span>
 							{result.ingredients.dextrose > 0 ? (
 								<>
 									{" · "}
 									destrosio{" "}
-									<span className="tabular-nums text-[rgb(var(--text-title))]">
+									<span className="tabular-nums text-foreground">
 										{result.ingredients.dextrose} g
 									</span>
 								</>
@@ -318,7 +317,7 @@ export default function App() {
 								<>
 									{" · "}
 									invertito{" "}
-									<span className="tabular-nums text-[rgb(var(--text-title))]">
+									<span className="tabular-nums text-foreground">
 										{result.ingredients.invertedSugar} g
 									</span>
 								</>
@@ -327,19 +326,19 @@ export default function App() {
 								<>
 									{" · "}
 									miele{" "}
-									<span className="tabular-nums text-[rgb(var(--text-title))]">
+									<span className="tabular-nums text-foreground">
 										{result.ingredients.honey} g
 									</span>
 								</>
 							) : null}
 							{" · "}
 							PAC{" "}
-							<span className="tabular-nums text-[rgb(var(--text-title))]">
+							<span className="tabular-nums text-foreground">
 								{result.pac.total}
 							</span>
 							{" · "}
 							POD{" "}
-							<span className="tabular-nums text-[rgb(var(--text-title))]">
+							<span className="tabular-nums text-foreground">
 								{result.pod}%
 							</span>
 							{addAlcohol && result.ingredients.alcohol > 0
@@ -347,7 +346,7 @@ export default function App() {
 								: null}
 						</p>
 					) : (
-						<p className="text-sm text-[rgb(var(--text-muted))]">
+						<p className="text-sm text-muted-foreground">
 							Scegliere una temperatura ribilancia zuccheri (e latte/acqua) così
 							la miscela si porziona a quella impostazione del freezer.
 						</p>
@@ -356,7 +355,7 @@ export default function App() {
 
 				<fieldset className="space-y-3">
 					<legend className={labelClass}>Opzioni zuccheri</legend>
-					<p className="text-sm text-[rgb(var(--text-muted))]">
+					<p className="text-sm text-muted-foreground">
 						Il default è saccarosio + destrosio. Il solo saccarosio ha PAC:POD =
 						1:1 — raggiungere PAC {SERVICE_TEMP.home.pacTarget} (−18°C)
 						significherebbe ~41% di zucchero.
@@ -371,9 +370,9 @@ export default function App() {
 							<label
 								key={key}
 								className={cn(
-									"flex cursor-pointer gap-2 border border-[rgb(var(--page-border))] px-3 py-2",
+									"flex cursor-pointer gap-2 border border-border px-3 py-2",
 									sugarMode === key &&
-										"border-[rgb(var(--brand))] bg-[rgb(var(--neutral-light))]",
+										"border-primary bg-muted",
 								)}
 							>
 								<input
@@ -385,10 +384,10 @@ export default function App() {
 									className="mt-1"
 								/>
 								<span>
-									<span className="block text-sm font-medium text-[rgb(var(--text-title))]">
+									<span className="block text-sm font-medium text-foreground">
 										{mode.label}
 									</span>
-									<span className="block text-sm text-[rgb(var(--text-muted))]">
+									<span className="block text-sm text-muted-foreground">
 										{mode.hint}
 									</span>
 								</span>
@@ -396,31 +395,31 @@ export default function App() {
 						))}
 					</div>
 					{result?.sucroseAdvisory ? (
-						<div className="space-y-2 border border-[rgb(var(--page-border))] p-3 text-sm">
-							<p className="font-medium text-[rgb(var(--text-title))]">
+						<div className="space-y-2 border border-border p-3 text-sm">
+							<p className="font-medium text-foreground">
 								Limite solo saccarosio @ {result.pac.celsius}°C
 							</p>
-							<p className="text-[rgb(var(--text-muted))]">
+							<p className="text-muted-foreground">
 								Il PAC target {result.pac.target} con solo saccarosio
 								richiederebbe{" "}
-								<span className="tabular-nums text-[rgb(var(--text-title))]">
+								<span className="tabular-nums text-foreground">
 									{result.sucroseAdvisory.sucroseGramsForTarget} g
 								</span>{" "}
 								(POD{" "}
-								<span className="tabular-nums text-[rgb(var(--text-title))]">
+								<span className="tabular-nums text-foreground">
 									{result.sucroseAdvisory.podIfSucroseOnly}%
 								</span>
 								) — stucchevole e soggetto a cristallizzazione. Questa ricetta
 								mantiene una dose edibile (POD {result.pod}%) e lascia il PAC
 								corto di{" "}
-								<span className="tabular-nums text-[rgb(var(--text-title))]">
+								<span className="tabular-nums text-foreground">
 									{result.sucroseAdvisory.pacShortfall}
 								</span>
 								.
 							</p>
-							<ul className="list-disc space-y-1 pl-5 text-[rgb(var(--text-muted))]">
+							<ul className="list-disc space-y-1 pl-5 text-muted-foreground">
 								<li>
-									<strong className="font-medium text-[rgb(var(--text-title))]">
+									<strong className="font-medium text-foreground">
 										Destrosio
 									</strong>{" "}
 									(migliore): ~{result.sucroseAdvisory.dextroseGramsForTarget} g
@@ -428,7 +427,7 @@ export default function App() {
 									{result.sucroseAdvisory.podWithDextrose}% (PAC 190 / POD 70).
 								</li>
 								<li>
-									<strong className="font-medium text-[rgb(var(--text-title))]">
+									<strong className="font-medium text-foreground">
 										Zucchero invertito
 									</strong>
 									: ~{result.sucroseAdvisory.invertGramsForTarget} g da solo →
@@ -438,7 +437,7 @@ export default function App() {
 									preparalo in casa:
 								</li>
 								<li>
-									<strong className="font-medium text-[rgb(var(--text-title))]">
+									<strong className="font-medium text-foreground">
 										Alcol
 									</strong>
 									: +{result.sucroseAdvisory.alcoholToCloseG} g al{" "}
@@ -447,8 +446,8 @@ export default function App() {
 									alcol sotto.
 								</li>
 							</ul>
-							<details className="text-[rgb(var(--text-muted))]">
-								<summary className="cursor-pointer font-medium text-[rgb(var(--text-title))]">
+							<details className="text-muted-foreground">
+								<summary className="cursor-pointer font-medium text-foreground">
 									Come fare lo zucchero invertito
 								</summary>
 								<p className="mt-2">{INVERT_SUGAR_HOWTO.summary}</p>
@@ -458,15 +457,15 @@ export default function App() {
 									))}
 								</ol>
 							</details>
-							<p className="text-[rgb(var(--text-muted))]">
+							<p className="text-muted-foreground">
 								Il freddo, l'overrun e gli ingredienti amari (cacao) attenuano
 								anche la dolcezza percepita rispetto al numero POD.
 							</p>
 						</div>
 					) : null}
 					{sugarMode === "inverted" ? (
-						<details className="text-sm text-[rgb(var(--text-muted))]">
-							<summary className="cursor-pointer font-medium text-[rgb(var(--text-title))]">
+						<details className="text-sm text-muted-foreground">
+							<summary className="cursor-pointer font-medium text-foreground">
 								Come fare lo zucchero invertito
 							</summary>
 							<p className="mt-2">{INVERT_SUGAR_HOWTO.summary}</p>
@@ -481,14 +480,21 @@ export default function App() {
 
 				<fieldset className="space-y-4">
 					<legend className={labelClass}>Additivi opzionali</legend>
-					<p className="text-sm text-[rgb(var(--text-muted))]">
+					<p className="text-sm text-muted-foreground">
 						Panna/acqua/limone/tuorlo spostano latte (o acqua). L'alcol sposta
-						liquido e ribilancia gli zuccheri (preferisci saccarosio), +
-						{ALCOHOL_MIX_TWEAKS.stabilizerBump * 100}% stabilizzante. Il limone
-						alza lo xantano del {LEMON_MIX_TWEAKS.stabilizerBumpPerStep * 100}%
-						ogni {LEMON_MIX_TWEAKS.lemonPercentPerStep}% di limone in miscela, e
-						va aggiunto a freddo se c'è latte. Il tuorlo è emulsionante/neutro
-						(non un gusto). Con alcol si consiglia caseina pura (disattivabile).
+						liquido e ribilancia gli zuccheri (preferisci saccarosio). Il neutro
+						è auto-dosato per famiglia (
+						{INGREDIENT_DATA.neutro.formula.gramsPerKgByKind.cream}/
+						{INGREDIENT_DATA.neutro.formula.gramsPerKgByKind.fruit}/
+						{INGREDIENT_DATA.neutro.formula.gramsPerKgByKind.sorbet} g/kg);
+						acido (fruit_acid o limone) ×
+						{1 + INGREDIENT_DATA.neutro.formula.acidBump}; alcol su crema/frutta
+						→ {INGREDIENT_DATA.neutro.formula.alcoholCreamGramsPerKg} g/kg, su
+						sorbetto ×{1 + INGREDIENT_DATA.neutro.formula.alcoholSorbetBump}. Il
+						tuorlo lo riduce (~
+						{INGREDIENT_DATA.eggYolk.formula.neutroEquivalentPerYolkGrams}{" "}
+						g/tuorlo). Il limone va aggiunto a freddo se c'è latte. Con alcol si
+						consiglia caseina pura (disattivabile).
 					</p>
 
 					<div className="space-y-3">
@@ -538,7 +544,7 @@ export default function App() {
 										onChange={setAlcoholAbv}
 										min={1}
 										suffix="%"
-										hint={`Stabilizzante +${ALCOHOL_MIX_TWEAKS.stabilizerBump * 100}% · preferisci saccarosio`}
+										hint={`Neutro alcol: ${INGREDIENT_DATA.neutro.formula.alcoholCreamGramsPerKg} g/kg crema/frutta · ×${1 + INGREDIENT_DATA.neutro.formula.alcoholSorbetBump} sorbetto · preferisci saccarosio`}
 									/>
 								</div>
 								<label className="flex items-center gap-2 text-sm">
@@ -615,7 +621,7 @@ export default function App() {
 								label="Succo di limone extra"
 								value={extraLemonGrams}
 								onChange={setExtraLemonGrams}
-								hint={`PAC/POD ${PAC_INDEX.lemonJuice} per 100 g · sposta latte/acqua · xantano +${LEMON_MIX_TWEAKS.stabilizerBumpPerStep * 100}% ogni ${LEMON_MIX_TWEAKS.lemonPercentPerStep}% limone · tipico ~${LEMON_MIX_TWEAKS.typicalGramsPerKg} g/kg`}
+								hint={`PAC/POD ${PAC_INDEX.lemonJuice} per 100 g · sposta latte/acqua · acido → neutro ×${1 + INGREDIENT_DATA.neutro.formula.acidBump} · tipico ~${LEMON_MIX_TWEAKS.typicalGramsPerKg} g/kg`}
 							/>
 						) : null}
 
@@ -662,22 +668,22 @@ export default function App() {
 			</form>
 
 			<section aria-live="polite" className="space-y-3">
-				<h2 className="text-xl font-semibold text-[rgb(var(--text-title))]">
+				<h2 className="text-xl font-semibold text-foreground">
 					Ricetta
 				</h2>
 				{!result ? (
-					<p className="text-[rgb(var(--text-muted))]">
+					<p className="text-muted-foreground">
 						Inserisci un peso di {isCream ? "miscela" : "frutta"} per generare
 						le quantità.
 					</p>
 				) : (
 					<>
-						<p className="text-sm text-[rgb(var(--text-muted))]">
+						<p className="text-sm text-muted-foreground">
 							Target {result.targetTotal} g · effettivo {result.actualTotal} g
 						</p>
 						<table className="w-full border-collapse text-left text-base">
 							<thead>
-								<tr className="border-b border-[rgb(var(--page-border))]">
+								<tr className="border-b border-border">
 									<th className="py-2 pr-4 font-medium">Ingrediente</th>
 									<th className="py-2 font-medium">g</th>
 								</tr>
@@ -688,7 +694,7 @@ export default function App() {
 								).map(({ key, label }) => (
 									<tr
 										key={key}
-										className="border-b border-[rgb(var(--page-border))]"
+										className="border-b border-border"
 									>
 										<td className="py-2 pr-4">{label}</td>
 										<td className="py-2 tabular-nums">
@@ -720,15 +726,15 @@ export default function App() {
 							))}
 						</ul>
 						{result.tips.length > 0 ? (
-							<ul className="space-y-1 text-sm text-[rgb(var(--brand))]">
+							<ul className="space-y-1 text-sm text-primary">
 								{result.tips.map((tip) => (
 									<li key={tip}>{tip}</li>
 								))}
 							</ul>
 						) : null}
 						{addAlcohol && useCaseinAdvice && result.ingredients.alcohol > 0 ? (
-							<div className="space-y-1 border border-[rgb(var(--page-border))] p-3 text-sm">
-								<p className="font-medium text-[rgb(var(--text-title))]">
+							<div className="space-y-1 border border-border p-3 text-sm">
+								<p className="font-medium text-foreground">
 									Caseina consigliata:{" "}
 									<span className="tabular-nums">
 										{Math.round(
@@ -740,24 +746,25 @@ export default function App() {
 									(+{CASEIN_ADVICE.gramsPerKg} g/kg — non in tabella: aggiungi a
 									mano)
 								</p>
-								<p className="text-[rgb(var(--text-muted))]">
+								<p className="text-muted-foreground">
 									{CASEIN_ADVICE.alcoholTip}
 								</p>
 								{kind === "fruit_acid" || result.ingredients.lemonJuice > 0 ? (
-									<p className="text-[rgb(var(--brand))]">
+									<p className="text-primary">
 										{CASEIN_ADVICE.acidWarning}
 									</p>
 								) : null}
 							</div>
 						) : null}
-						<p className="text-sm text-[rgb(var(--text-muted))]">
-							Xantano max ≈ {INGREDIENT_DATA.xanthan.formula.maxPercent}% della
-							miscela — mescola a secco con gli zuccheri prima dei liquidi.
+						<p className="text-sm text-muted-foreground">
+							Neutro auto-dosato — mescola a secco con ~10× saccarosio; attiva a
+							82–85°C. (Lo xantano domestico ≠ neutro commerciale; non è in
+							formula.)
 						</p>
 
 						{pac ? (
-							<div className="space-y-2 border border-[rgb(var(--page-border))] p-3">
-								<h3 className="text-base font-medium text-[rgb(var(--text-title))]">
+							<div className="space-y-2 border border-border p-3">
+								<h3 className="text-base font-medium text-foreground">
 									Bilancio PAC @ {pac.celsius}°C
 								</h3>
 								<ul className="space-y-1 text-sm tabular-nums">
@@ -800,7 +807,7 @@ export default function App() {
 										</li>
 									)}
 								</ul>
-								<p className="text-sm text-[rgb(var(--text-muted))]">
+								<p className="text-sm text-muted-foreground">
 									Indici — PAC saccarosio {PAC_INDEX.sucrose} / destrosio{" "}
 									{PAC_INDEX.dextrose} / invertito {PAC_INDEX.invertedSugar} /
 									miele {PAC_INDEX.honey} / limone {PAC_INDEX.lemonJuice}. POD
@@ -815,16 +822,16 @@ export default function App() {
 							</div>
 						) : null}
 
-						<div className="space-y-3 border border-[rgb(var(--page-border))] p-3">
-							<h3 className="text-base font-medium text-[rgb(var(--text-title))]">
+						<div className="space-y-3 border border-border p-3">
+							<h3 className="text-base font-medium text-foreground">
 								{MIX_PROCEDURE.title}
 							</h3>
 							{MIX_PROCEDURE.stages.map((stage) => (
 								<div key={stage.title} className="space-y-1">
-									<p className="text-sm font-medium text-[rgb(var(--text-title))]">
+									<p className="text-sm font-medium text-foreground">
 										{stage.title}
 									</p>
-									<ul className="list-disc space-y-1 pl-5 text-sm text-[rgb(var(--text-muted))]">
+									<ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
 										{stage.points.map((point) => (
 											<li key={point}>{point}</li>
 										))}
@@ -838,10 +845,10 @@ export default function App() {
 
 			{isCream ? (
 				<section className="space-y-3">
-					<h2 className="text-xl font-semibold text-[rgb(var(--text-title))]">
+					<h2 className="text-xl font-semibold text-foreground">
 						Gusti su base bianca
 					</h2>
-					<p className="text-sm text-[rgb(var(--text-muted))]">
+					<p className="text-sm text-muted-foreground">
 						Dosi per {mixForFlavors} g di miscela. Gusti che si sciolgono:
 						sottrai lo stesso peso dal latte. Inclusioni: aggiungi durante/a
 						fine mantecatura. Per il tuorlo (emulsionante/neutro) usa gli
@@ -849,7 +856,7 @@ export default function App() {
 					</p>
 					<table className="w-full border-collapse text-left text-base">
 						<thead>
-							<tr className="border-b border-[rgb(var(--page-border))]">
+							<tr className="border-b border-border">
 								<th className="py-2 pr-4 font-medium">Gusto</th>
 								<th className="py-2 pr-4 font-medium">Dose</th>
 								<th className="py-2 font-medium">Note</th>
@@ -865,14 +872,14 @@ export default function App() {
 								return (
 									<tr
 										key={key}
-										className="border-b border-[rgb(var(--page-border))] align-top"
+										className="border-b border-border align-top"
 									>
 										<td className="py-2 pr-4">{label}</td>
 										<td className="py-2 pr-4 whitespace-nowrap tabular-nums">
 											{flavorDoseLabel(key, mixForFlavors)}
 											{replaces}
 										</td>
-										<td className="py-2 text-sm text-[rgb(var(--text-muted))]">
+										<td className="py-2 text-sm text-muted-foreground">
 											{note}
 										</td>
 									</tr>

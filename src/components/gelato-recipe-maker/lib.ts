@@ -7,7 +7,6 @@ import {
 	FRUIT_TO_TOTAL,
 	INGREDIENT_DATA,
 	KIND,
-	LEMON_MIX_TWEAKS,
 	PAC_INDEX,
 	POD_INDEX,
 	type RecipeKind,
@@ -161,9 +160,9 @@ export type RecipeInput = {
 	extraPannaGrams?: number;
 	/** Extra water beyond the formula amount (displaces milk when liquid is milk). */
 	extraWaterGrams?: number;
-	/** Extra lemon juice beyond formula (displaces milk/water; xanthan scales with lemon %). */
+	/** Extra lemon juice beyond formula (displaces milk/water; acid bumps neutro ×1.25). */
 	extraLemonGrams?: number;
-	/** Egg yolk as emulsifier/neutro (displaces milk/water). */
+	/** Egg yolk as emulsifier/neutro (displaces milk/water; reduces neutro dose). */
 	eggYolkGrams?: number;
 };
 
@@ -180,7 +179,7 @@ export type RecipeIngredients = {
 	water: number;
 	lemonJuice: number;
 	eggYolk: number;
-	xanthan: number;
+	neutro: number;
 	salt: number;
 	alcohol: number;
 };
@@ -389,22 +388,33 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 	const formulaPanna = targetTotal * params.pannaFactor;
 	const extraLemon = Math.max(0, input.extraLemonGrams ?? 0);
 	const lemonJuice = targetTotal * params.lemonPerKg + extraLemon;
-	const lemonPercent = targetTotal > 0 ? (lemonJuice / targetTotal) * 100 : 0;
-	const lemonXanthanSteps = Math.floor(
-		lemonPercent / LEMON_MIX_TWEAKS.lemonPercentPerStep,
-	);
-	const lemonXanthanBump =
-		lemonXanthanSteps * LEMON_MIX_TWEAKS.stabilizerBumpPerStep;
-	const alcoholXanthanBump =
-		alcohol > 0 ? ALCOHOL_MIX_TWEAKS.stabilizerBump : 0;
-	let xanthan = targetTotal * params.xanthanFactor;
-	if (alcoholXanthanBump + lemonXanthanBump > 0) {
-		xanthan *= 1 + alcoholXanthanBump + lemonXanthanBump;
+	const eggYolk = Math.max(0, input.eggYolkGrams ?? 0);
+
+	const nf = INGREDIENT_DATA.neutro.formula;
+	const kindKey =
+		input.kind === "sorbet"
+			? "sorbet"
+			: input.kind === "cream"
+				? "cream"
+				: "fruit";
+	let neutroPerKg = nf.gramsPerKgByKind[kindKey];
+	const isCreamOrFruit = kindKey === "cream" || kindKey === "fruit";
+	if (alcohol > 0 && isCreamOrFruit) {
+		neutroPerKg = nf.alcoholCreamGramsPerKg;
 	}
+	const hasAcid = input.kind === "fruit_acid" || lemonJuice > 0;
+	const acidApplied = hasAcid;
+	const alcoholSorbetApplied = alcohol > 0 && input.kind === "sorbet";
+	if (acidApplied) neutroPerKg *= 1 + nf.acidBump;
+	if (alcoholSorbetApplied) neutroPerKg *= 1 + nf.alcoholSorbetBump;
+	const yolkNeutroEq =
+		(eggYolk / INGREDIENT_DATA.eggYolk.formula.yolkGramsEach) *
+		INGREDIENT_DATA.eggYolk.formula.neutroEquivalentPerYolkGrams;
+	const neutro = Math.max(0, (neutroPerKg * targetTotal) / 1000 - yolkNeutroEq);
+
 	const salt = (targetTotal * INGREDIENT_DATA.salt.formula.gramsPerKg) / 1000;
 	const extraPanna = Math.max(0, input.extraPannaGrams ?? 0);
 	const extraWater = Math.max(0, input.extraWaterGrams ?? 0);
-	const eggYolk = Math.max(0, input.eggYolkGrams ?? 0);
 
 	// Extras + alcohol count toward fixed weight so residual milk/water shrinks.
 	const fixed =
@@ -417,7 +427,7 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		extraPanna +
 		lemonJuice +
 		eggYolk +
-		xanthan +
+		neutro +
 		salt +
 		alcohol +
 		extraWater;
@@ -436,7 +446,7 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		water: round(formulaWater + extraWater),
 		lemonJuice: round(lemonJuice),
 		eggYolk: round(eggYolk),
-		xanthan: round(xanthan, 2),
+		neutro: round(neutro, 2),
 		salt: round(salt, 2),
 		alcohol: round(alcohol),
 	};
@@ -464,9 +474,21 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 	}));
 
 	const tips: string[] = [];
-	if (lemonXanthanSteps > 0) {
+	{
+		const baseKg = nf.gramsPerKgByKind[kindKey];
+		const parts: string[] = [`base ${baseKg} g/kg`];
+		if (alcohol > 0 && isCreamOrFruit) {
+			parts.push(`alcol → ${nf.alcoholCreamGramsPerKg} g/kg`);
+		}
+		if (acidApplied) parts.push(`acido ×${1 + nf.acidBump}`);
+		if (alcoholSorbetApplied) {
+			parts.push(`alcol+sorbetto ×${1 + nf.alcoholSorbetBump}`);
+		}
+		if (yolkNeutroEq > 0) {
+			parts.push(`−${round(yolkNeutroEq, 1)} g (tuorlo)`);
+		}
 		tips.push(
-			`Xantano +${lemonXanthanBump * 100}%: limone ≈ ${round(lemonPercent, 1)}% della miscela (${lemonXanthanSteps}× ogni ${LEMON_MIX_TWEAKS.lemonPercentPerStep}% → +${LEMON_MIX_TWEAKS.stabilizerBumpPerStep * 100}%).`,
+			`Neutro: ${ingredients.neutro} g (${parts.join("; ")}). Mescola a secco con ~10× saccarosio; attiva a 82–85°C.`,
 		);
 	}
 	if (ingredients.lemonJuice > 0 && params.liquid === "milk") {
@@ -477,10 +499,8 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 	if (eggYolk > 0) {
 		const yolkG = INGREDIENT_DATA.eggYolk.formula.yolkGramsEach;
 		const yolks = round(eggYolk / yolkG, 1);
-		const neutroEq =
-			yolks * INGREDIENT_DATA.eggYolk.formula.neutroEquivalentPerYolkGrams;
 		tips.push(
-			`Tuorlo: ≈ ${yolks} tuorli (≈ ${round(neutroEq, 1)} g neutro emulsionante). Coagula a ~65°C — non superare in pastorizzazione.`,
+			`Tuorlo: ≈ ${yolks} tuorli (≈ ${round(yolkNeutroEq, 1)} g neutro sostituiti). Coagula a ~65°C — non superare in pastorizzazione.`,
 		);
 	}
 

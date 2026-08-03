@@ -264,9 +264,9 @@ export const INGREDIENT_DATA = {
 		pac: 0,
 		solidsPercent: [50, 56] as const,
 		notes:
-			"Grazie alla lecitina lega grassi e acqua — non è un gusto, è un ingrediente funzionale. Coagula a ~65°C. 1 tuorlo ≈ 20 g ≈ 2 g di neutro emulsionante. Minimo legale ~40 g/kg (4%) per «Mantecato».",
+			"Grazie alla lecitina lega grassi e acqua — non è un gusto, è un ingrediente funzionale. Coagula a ~65°C. 1 tuorlo ≈ 20 g ≈ 2 g di neutro emulsionante (riduce la dose di neutro in formula). Minimo legale ~40 g/kg (4%) per «Mantecato».",
 		dosage:
-			"Come neutro per creme: 80–100 g/kg (~4–5 tuorli). Emulsione senza altri emulsionanti: almeno 3 tuorli/kg (≈60 g). Supporto in ricette complesse (cioccolato / frutta secca): 20–30 g/kg.",
+			"Come crema «all'uovo»: 80–100 g/kg (~4–5 tuorli). Solo emulsione (senza altri emulsionanti): basta meno — almeno 3 tuorli/kg (≈60 g) — e riduce il neutro. Supporto in ricette complesse (cioccolato / frutta secca): 20–30 g/kg.",
 		formula: {
 			gramsPerKg: 100,
 			yolkGramsEach: 20,
@@ -274,6 +274,28 @@ export const INGREDIENT_DATA = {
 			neutroEquivalentPerYolkGrams: 2,
 			neutroGramsPerKgMin: 80,
 			neutroGramsPerKgMax: 100,
+		},
+	},
+	/** Commercial stabilizer blend — formula-dosed (replaces xanthan auto-dose). */
+	neutro: {
+		label: "Neutro",
+		role: "Stabilizzante / emulsionante (miscela commerciale)",
+		pod: 0,
+		pac: 0,
+		solidsPercent: 100,
+		notes:
+			"Pesatura precisa. Mescola a secco con ~10× saccarosio; attiva a 82–85°C. Il tuorlo sostituisce ~2 g di neutro per tuorlo.",
+		dosage:
+			"6 g/kg crema · 7 g/kg frutta · 5 g/kg sorbetto; ×1,25 se acido; alcol+crema/frutta → 8 g/kg; alcol+sorbetto → ×1,25",
+		formula: {
+			gramsPerKgByKind: {
+				cream: 6,
+				fruit: 7,
+				sorbet: 5,
+			},
+			alcoholCreamGramsPerKg: 8,
+			acidBump: 0.25,
+			alcoholSorbetBump: 0.25,
 		},
 	},
 	locustBeanGum: {
@@ -295,6 +317,7 @@ export const INGREDIENT_DATA = {
 		notes: "Solubile a freddo; stabile in ambienti acidi; ideale per HTST.",
 		dosage: "0,15%–0,20%",
 	},
+	/** Sheet reference only — not formula-dosed (use neutro in recipe). */
 	xanthan: {
 		label: "Gomma xantano (E415)",
 		role: "Addensante, stabilizzante",
@@ -302,9 +325,9 @@ export const INGREDIENT_DATA = {
 		pac: 0,
 		solidsPercent: null,
 		notes:
-			"Resiste a pH acidi; ottima per sorbetti; struttura cremosa. Max tip UI ~0,2% del mix.",
+			"Uso domestico / componente di neutri. Resiste a pH acidi; struttura cremosa. ≠ neutro commerciale auto-dosato in formula. Max tipico ~0,2% del mix.",
 		dosage:
-			"0,15% frutta / 0,6% base bianca / 0,5% sorbetto; +25% con alcol; +25% ogni 2,5% limone in miscela",
+			"0,15% frutta / 0,6% base bianca / 0,5% sorbetto (riferimento; in ricetta usa Neutro)",
 		formula: {
 			factorByKind: {
 				fruit_acid: 0.0015,
@@ -442,7 +465,7 @@ export const INGREDIENT_DATA = {
 		notes:
 			"~5% zuccheri naturali; PAC/POD 5 per 100 g. Aggiungere a freddo (≤ 2–4°C) su basi al latte — a pH < 5 la caseina precipita.",
 		dosage:
-			"0 frutta acida/crema; 35 g/kg frutta dolce/sorbetto (+ extra opzionale). Xantano +25% ogni 2,5% di limone in miscela.",
+			"0 frutta acida/crema; 35 g/kg frutta dolce/sorbetto (+ extra opzionale). Acido (fruit_acid o limone in ricetta) → neutro ×1,25.",
 		formula: {
 			typicalGramsPerKg: 35,
 			stabilizerBump: 0.25,
@@ -470,7 +493,7 @@ export const INGREDIENT_DATA = {
 		pac: null,
 		solidsPercent: null,
 		notes:
-			"PAC = grammi di alcol puro per kg × 9. Preferisci saccarosio (evita destrosio/invertito ad alto PAC). +25% xantano.",
+			"PAC = grammi di alcol puro per kg × 9. Preferisci saccarosio (evita destrosio/invertito ad alto PAC). Con alcol: neutro 8 g/kg su crema/frutta, ×1,25 su sorbetto.",
 		dosage:
 			"Opzionale; sposta latte/acqua e ribilancia gli zuccheri per riservare margine PAC.",
 		formula: { pacPerPureGram: 9, stabilizerBump: 0.25 },
@@ -605,14 +628,14 @@ export const MIX_PROCEDURE = {
 			points: [
 				"Prima i liquidi freddi: versa latte e panna.",
 				"Incorpora le polveri (zuccheri, latte in polvere) ancora a freddo; agita con forza per evitare grumi.",
-				"Stabilizzante (neutro / xantano): mescola con un po' di zucchero e aggiungi intorno ai 40°C così si disperde invece di galleggiare sul vapore.",
+				"Neutro: mescola a secco con ~10× saccarosio (pesata precisa), poi incorpora con le altre polveri ancora a freddo così si disperde senza grumi.",
 			],
 		},
 		{
 			title: "2. Riscaldare a 85°C (pastorizzazione alta)",
 			points: [
-				"Porta la miscela a 85°C; inizia a raffreddare subito o dopo pochi secondi (niente sosta lunga).",
-				"Non solo sanificazione: attiva neutri/stabilizzanti (idratazione ottimale sopra ~80–82°C), emulsiona i grassi, scioglie gli zuccheri in modo uniforme e idrata le proteine del latte così legano l'acqua libera.",
+				"Porta la miscela a 82–85°C; inizia a raffreddare subito o dopo pochi secondi (niente sosta lunga).",
+				"Non solo sanificazione: attiva il neutro (idratazione ottimale a 82–85°C), emulsiona i grassi, scioglie gli zuccheri in modo uniforme e idrata le proteine del latte così legano l'acqua libera.",
 			],
 		},
 		{
@@ -697,7 +720,6 @@ type KindParams = {
 	sugarTotalFactor: number;
 	fruitSugarFactor: number;
 	pannaFactor: number;
-	xanthanFactor: number;
 	lemonPerKg: number;
 	/** Creams use milk residual; sorbets use water residual. */
 	liquid: "milk" | "water";
@@ -711,7 +733,6 @@ export const KIND: Record<RecipeKind, KindParams> = {
 		sugarTotalFactor: 0.18,
 		fruitSugarFactor: 0.1,
 		pannaFactor: 0.12,
-		xanthanFactor: INGREDIENT_DATA.xanthan.formula.factorByKind.fruit_acid,
 		lemonPerKg: 0,
 		liquid: "milk",
 		sucroseShare: 0.8,
@@ -721,7 +742,6 @@ export const KIND: Record<RecipeKind, KindParams> = {
 		sugarTotalFactor: 0.18,
 		fruitSugarFactor: 0.15,
 		pannaFactor: 0.12,
-		xanthanFactor: INGREDIENT_DATA.xanthan.formula.factorByKind.fruit_sweet,
 		lemonPerKg: INGREDIENT_DATA.lemonJuice.formula.typicalGramsPerKg / 1000,
 		liquid: "milk",
 		sucroseShare: 0.8,
@@ -731,7 +751,6 @@ export const KIND: Record<RecipeKind, KindParams> = {
 		sugarTotalFactor: 0.18,
 		fruitSugarFactor: 0,
 		pannaFactor: 0.17,
-		xanthanFactor: INGREDIENT_DATA.xanthan.formula.factorByKind.cream,
 		lemonPerKg: 0,
 		liquid: "milk",
 		sucroseShare: 0.8,
@@ -741,7 +760,6 @@ export const KIND: Record<RecipeKind, KindParams> = {
 		sugarTotalFactor: 0.25,
 		fruitSugarFactor: 0.1,
 		pannaFactor: 0,
-		xanthanFactor: INGREDIENT_DATA.xanthan.formula.factorByKind.sorbet,
 		lemonPerKg: INGREDIENT_DATA.lemonJuice.formula.typicalGramsPerKg / 1000,
 		liquid: "water",
 		sucroseShare: 0.7,
@@ -786,7 +804,7 @@ export const INGREDIENT_ROWS = [
 	{ key: "eggYolk", label: "Tuorlo d'uovo" },
 	{ key: "water", label: "Acqua" },
 	{ key: "lemonJuice", label: "Succo di limone" },
-	{ key: "xanthan", label: "Xantano" },
+	{ key: "neutro", label: "Neutro" },
 	{ key: "salt", label: "Sale" },
 	{ key: "alcohol", label: "Alcol" },
 ] as const;
@@ -854,7 +872,7 @@ export const FLAVOR_ROWS: {
 ];
 
 export const fieldClass =
-	"mt-1 w-full border border-[rgb(var(--page-border))] bg-[rgb(var(--header))] px-3 py-2 text-base text-[rgb(var(--text-color))] outline-none focus-visible:border-[rgb(var(--brand))] focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand)/0.25)]";
+	"mt-1 w-full border border-border bg-background px-3 py-2 text-base text-foreground outline-none focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-ring/25";
 
 export const labelClass =
-	"block text-sm font-medium text-[rgb(var(--text-title))]";
+	"block text-sm font-medium text-foreground";
