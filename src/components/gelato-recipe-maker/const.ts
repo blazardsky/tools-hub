@@ -8,7 +8,6 @@ export const TARGETS = {
 	sugarsCream: { min: 18, max: 22 },
 	sugarsSorbet: { min: 25, max: 30 },
 	fatsCream: { min: 4, max: 6 },
-	xanthanMaxPercent: 0.2,
 } as const;
 
 /**
@@ -25,6 +24,7 @@ export const ADDITIVE_ALERTS = {
  * Base bianca flavor doses per kg of mix (typically calculated on 1000g).
  * Dissolving flavors: subtract the same weight from milk to keep total.
  * Inclusions: add during/at end of churn — do not displace milk.
+ * Keep in sync with INGREDIENT_DATA.formula.gramsPerKg for cocoa/couverture/egg/nuts.
  */
 export const BASE_BIANCA_FLAVORS = {
 	coffeeFreezeDried: { gramsPerKg: 20, replaceMilk: true },
@@ -37,9 +37,7 @@ export const BASE_BIANCA_FLAVORS = {
 	stracciatella: { gramsPerKg: 100, replaceMilk: false },
 	nuts: { gramsPerKg: 100, replaceMilk: false },
 	candiedFruit: { gramsPerKg: 100, replaceMilk: false },
-	/** Turn base bianca into egg base (mantecato). */
-	eggYolk: { gramsPerKg: 100, replaceMilk: true },
-	/** Crema catalana: caramel pieces at end of churn (on egg base). */
+	/** Crema catalana: caramel pieces at end of churn (with egg-yolk emulsified base). */
 	catalanaCaramel: { gramsPerKg: 50, replaceMilk: false },
 	/** Cut base sugars when using sugary inclusions (candied, raisins, caramel). */
 	sugaryInclusionSugarCut: { gramsPerKg: 20 },
@@ -64,31 +62,488 @@ export const SERVICE_TEMP = {
 
 export type ServiceTempKey = keyof typeof SERVICE_TEMP;
 
-/** Relative PAC index (sucrose = 100). */
-export const PAC_INDEX = {
-	sucrose: 100,
-	dextrose: 190,
-	invertedSugar: 190,
-	/** Honey ≈ invert sugar (glucose + fructose). */
-	honey: 190,
-	/** Atomized glucose 21 DE — solids without PAC. */
-	glucoseAtomized21DE: 0,
-	lactose: 100,
-	/** Lemon juice ≈ 5% natural sugars; 100 g → 5 PAC on a 1 kg mix. */
-	lemonJuice: 5,
+/**
+ * Canonical ingredient data — source of truth for formula PAC/POD and key doses.
+ * `pac`/`pod` may be a number, a [min,max] range (display), or null.
+ * `formula` holds values the calculator uses (overrides when pac/pod is a range).
+ */
+export const INGREDIENT_DATA = {
+	sucrose: {
+		label: "Saccarosio",
+		role: "Dolcificante, strutturante, controllo temperatura di congelamento",
+		pod: 100,
+		pac: 100,
+		solidsPercent: 100,
+		notes:
+			"Zucchero di riferimento (disaccaride); cristallizza a basse temperature; ottima solubilità (204 g in 100 g acqua a 20°C); 4 kcal/g. Nei liquori si preferisce quasi solo saccarosio (PAC 100 < destrosio/invertito 190) per non far sciogliere il gelato.",
+		dosage:
+			"Creme: dolcezza rif. ~18%, zuccheri totali 17–22% (formula ~18%; sola saccarosio ~17,5%). Sorbetti: +5–8% vs creme → 22–25% (fino al 30%; formula ~25%; sola saccarosio ~23%). Liquore: ~15–16% quasi solo saccarosio. Share formula 80% creme / 70% sorbetto (100% se sola saccarosio o con alcol).",
+	},
+	dextrose: {
+		label: "Destrosio (glucosio)",
+		role: "Anticristallizzante, anticongelante, riduzione dolcezza",
+		pod: [70, 80] as const,
+		pac: [180, 190] as const,
+		solidsPercent: [91, 100] as const,
+		notes:
+			"Monosaccaride da mais; polvere molto solubile; effetto rinfrescante; zucchero riducente; abbassa il punto di congelamento. Max ~25% del totale zuccheri per non abbassare troppo il punto di congelamento. Indice di lavoro POD 70 / PAC 190.",
+		dosage:
+			"Formula blend: resto dopo saccarosio (20% creme / 30% sorbetto degli zuccheri). Vetrina (−11/−12°C): spesso ~20 g/kg (2%). Freezer casa (−18°C): fino a ~137–150 g/kg (13–15%) per alzare il PAC senza dolcezza eccessiva. Fonti: 5–10% del mix come range generico.",
+		formula: { pac: 190, pod: 70 },
+	},
+	invertedSugar: {
+		label: "Zucchero invertito",
+		role: "Anticristallizzante, ammorbidificante, umettante",
+		pod: 130,
+		pac: 190,
+		solidsPercent: [70, 80] as const,
+		notes:
+			"Sciroppo di glucosio e fruttosio; alta igroscopicità; ritarda l'ossidazione; solubilità superiore al saccarosio. Evita cristallizzazione di saccarosio e lattosio; mantiene il gelato più plastico e morbido. Indice di lavoro POD 130 / PAC 190.",
+		dosage:
+			"5–15% del totale zuccheri (max 20–25%). In formula: sostituisce la quota destrosio in modalità invertito.",
+	},
+	fructose: {
+		label: "Fruttosio (levulosio)",
+		role: "Edulcorante intenso, umettante",
+		pod: [120, 170] as const,
+		pac: 190,
+		solidsPercent: 100,
+		notes:
+			"Zucchero della frutta; altamente solubile e igroscopico; esalta i sapori di frutta; basso indice glicemico. Indice di lavoro POD 145 / PAC 190 (non ancora in formula).",
+		dosage: "Ridotto rispetto al saccarosio; dosi limitate",
+		formula: { pac: 190, pod: 145 },
+	},
+	honey: {
+		label: "Miele",
+		role: "Aromatizzante, zucchero invertito naturale",
+		pod: [100, 130] as const,
+		pac: 190,
+		solidsPercent: [80, 82] as const,
+		notes:
+			"Composizione simile allo zucchero invertito; sapore caratteristico; pH acido (~4). Indice di lavoro POD 130 / PAC 190 (come invertito).",
+		dosage:
+			"Per aromatizzare e conferire morbidezza. In formula: sostituisce la quota destrosio in modalità miele.",
+		formula: { pac: 190, pod: 130 },
+	},
+	lactose: {
+		label: "Lattosio",
+		role: "Assorbimento acqua, strutturante",
+		pod: [15, 40] as const,
+		pac: 100,
+		solidsPercent: 100,
+		notes:
+			"Zucchero del latte poco solubile; assorbe ~10× il suo peso in acqua; rischio sabbiosità se in eccesso. Indice di lavoro POD 16 / PAC 100 (non dosato in formula).",
+		dosage:
+			"Apportato dai derivati del latte (SLNG); limitare per evitare difetti. Non dosato in ricetta; con latte senza lattosio tip UI −10% zuccheri se il mix risulta morbido/dolce.",
+		formula: {
+			pac: 100,
+			pod: 16,
+		},
+	},
+	glucoseAtomized42DE: {
+		label: "Glucosio atomizzato 42 DE",
+		role: "Strutturante, controllo consistenza",
+		pod: [40, 50] as const,
+		pac: 90,
+		solidsPercent: 100,
+		notes:
+			"Polvere di mais; bilancia la consistenza e previene la cristallizzazione superficiale. Indice di lavoro POD 45 / PAC 90 (non in formula).",
+		dosage: "Per bilanciare la struttura",
+		formula: {
+			pac: 90,
+			pod: 45,
+		},
+	},
+	glucoseAtomized52DE: {
+		label: "Glucosio atomizzato 52 DE",
+		role: "Strutturante, controllo PAC",
+		pod: 58,
+		pac: 110,
+		solidsPercent: 100,
+		notes:
+			"Polvere sottile e secca di mais; intermedio tra sciroppo e destrosio.",
+		dosage: "Varia per ammorbidire o indurire il gelato",
+	},
+	glucoseAtomized21DE: {
+		label: "Glucosio atomizzato 21 DE",
+		role: "Riduzione overrun (antischiumogeno)",
+		pod: 10,
+		pac: 20,
+		solidsPercent: 100,
+		notes: "Alto contenuto di amido; rende il mix più pesante e denso.",
+		dosage: "5%–20% nei gelati al liquore",
+	},
+	glucoseSyrup: {
+		label: "Sciroppo di glucosio / mais",
+		role: "Strutturante, anticristallizzante",
+		pod: [40, 60] as const,
+		pac: null,
+		solidsPercent: [80, 100] as const,
+		notes:
+			"Liquido denso o polvere; maltosio e destrine; migliora conservabilità e corpo. PAC varia con il DE.",
+		dosage: "4%–6% (solidi) o sostituzione 20–30% saccarosio",
+	},
+	maltose: {
+		label: "Maltosio",
+		role: "Sapore caratteristico, brunimento",
+		pod: 50,
+		pac: 100,
+		solidsPercent: 100,
+		notes: "Presente nello sciroppo di malto; zucchero riducente.",
+		dosage: "In sciroppi o estratti di malto",
+	},
+	trehalose: {
+		label: "Trealosio",
+		role: "Ritardo ricristallizzazione ghiaccio",
+		pod: [10, 14] as const,
+		pac: null,
+		solidsPercent: 100,
+		notes:
+			"Zucchero non riducente; basso indice glicemico; previene la denaturazione delle proteine. Indice di lavoro POD 12.",
+		dosage: null,
+		formula: {
+			pod: 12,
+		},
+	},
+	inulin: {
+		label: "Inulina",
+		role: "Fibra, sostituto dei solidi",
+		pod: 10,
+		pac: null,
+		solidsPercent: null,
+		notes:
+			"Fibra di cicoria (prebiotico); ideale per sorbetti e gelati ipocalorici o alcolici. PAC basso.",
+		dosage: "Fino al 12%",
+		formula: {
+			pod: 10,
+		},
+	},
+	wholeMilk: {
+		label: "Latte intero",
+		role: "Base liquida, apporto grassi e proteine",
+		pod: null,
+		pac: 4,
+		solidsPercent: [12, 13] as const,
+		notes:
+			"~87–88% acqua, 3,6% grassi, 3,3% proteine; apporta calcio e nutrienti. PAC 4 in indice ma non contato nel bilancio formula.",
+		dosage: "Q.b. residuo (creme / frutta); non conta nel bilancio PAC",
+	},
+	skimMilkPowder: {
+		label: "Latte magro in polvere (LMP)",
+		role: "Strutturante, ritenzione acqua (ossatura)",
+		pod: null,
+		pac: 50,
+		solidsPercent: [95, 100] as const,
+		notes: "Proteine 36–38%, lattosio 50–51%; favorisce l'overrun.",
+		dosage: "Max 10% del mix; SLNG tra 7,5% e 11,5%",
+	},
+	cream35: {
+		label: "Panna (35–40% MG)",
+		role: "Apporto materia grassa, cremosità",
+		pod: null,
+		pac: 3,
+		solidsPercent: [40, 50] as const,
+		notes:
+			"Emulsione di grassi lattei; untuosità, palatabilità e resistenza alla fusione. I grassi non influenzano direttamente il PAC (non sono in soluzione vera, ma in emulsione). Target grassi totali ideale ~8% (range 6–10%); creme alla frutta 4–6% per non coprire il frutto; sorbetti 0%.",
+		dosage:
+			"Formula: 12% frutta / 17% base bianca / 0% sorbetto (+ extra opzionale). Obiettivo grassi mix ~8% (6–10%); frutta 4–6%.",
+	},
+	butter: {
+		label: "Burro",
+		role: "Apporto di grassi",
+		pod: 0,
+		pac: 0,
+		solidsPercent: [82, 84] as const,
+		notes: "Grasso del latte concentrato; cremosità e formazione dell'overrun.",
+		dosage: "Per bilanciare la quota grassa",
+	},
+	eggYolk: {
+		label: "Tuorlo d'uovo",
+		role: "Emulsionante naturale (neutro), legante, colorante",
+		pod: 0,
+		pac: 0,
+		solidsPercent: [50, 56] as const,
+		notes:
+			"Grazie alla lecitina lega grassi e acqua — non è un gusto, è un ingrediente funzionale. Coagula a ~65°C. 1 tuorlo ≈ 20 g ≈ 2 g di neutro emulsionante. Minimo legale ~40 g/kg (4%) per «Mantecato».",
+		dosage:
+			"Come neutro per creme: 80–100 g/kg (~4–5 tuorli). Emulsione senza altri emulsionanti: almeno 3 tuorli/kg (≈60 g). Supporto in ricette complesse (cioccolato / frutta secca): 20–30 g/kg.",
+		formula: {
+			gramsPerKg: 100,
+			yolkGramsEach: 20,
+			minYolksPerKgForEmulsion: 3,
+			neutroEquivalentPerYolkGrams: 2,
+			neutroGramsPerKgMin: 80,
+			neutroGramsPerKgMax: 100,
+		},
+	},
+	locustBeanGum: {
+		label: "Farina di semi di carrube (E410)",
+		role: "Stabilizzante, addensante",
+		pod: 0,
+		pac: 0,
+		solidsPercent: 100,
+		notes:
+			"Polisaccaride idrofilo; si scioglie solo a caldo; riduce la crescita dei cristalli di ghiaccio.",
+		dosage: "0,1%–0,5% (fino a 1% in miscela)",
+	},
+	guarGum: {
+		label: "Gomma di guar (E412)",
+		role: "Stabilizzante, addensante",
+		pod: 0,
+		pac: 0,
+		solidsPercent: 100,
+		notes: "Solubile a freddo; stabile in ambienti acidi; ideale per HTST.",
+		dosage: "0,15%–0,20%",
+	},
+	xanthan: {
+		label: "Gomma xantano (E415)",
+		role: "Addensante, stabilizzante",
+		pod: 0,
+		pac: 0,
+		solidsPercent: null,
+		notes:
+			"Resiste a pH acidi; ottima per sorbetti; struttura cremosa. Max tip UI ~0,2% del mix.",
+		dosage:
+			"0,15% frutta / 0,6% base bianca / 0,5% sorbetto; +25% con alcol; +25% ogni 2,5% limone in miscela",
+		formula: {
+			factorByKind: {
+				fruit_acid: 0.0015,
+				fruit_sweet: 0.0015,
+				cream: 0.006,
+				sorbet: 0.005,
+			},
+			maxPercent: 0.2,
+		},
+	},
+	carrageenan: {
+		label: "Carragenina",
+		role: "Stabilizzante secondario",
+		pod: 0,
+		pac: 0,
+		solidsPercent: 100,
+		notes:
+			"Previene la separazione del siero (wheying off); sinergica con altre gomme.",
+		dosage: "Minime dosi in miscele stabilizzanti",
+	},
+	agarAgar: {
+		label: "Agar-agar",
+		role: "Gelificante",
+		pod: 0,
+		pac: 0,
+		solidsPercent: null,
+		notes: "Estratto da alghe rosse; si scioglie a 65–75°C; forma gel densi.",
+		dosage: "0,15%–0,25%",
+	},
+	monoDiglycerides: {
+		label: "Mono- e digliceridi (E471)",
+		role: "Emulsionante",
+		pod: 0,
+		pac: 0,
+		solidsPercent: 100,
+		notes:
+			"Derivati vegetali; destabilizzazione controllata dei grassi per struttura asciutta.",
+		dosage: "0,1%–0,3% della miscela",
+	},
+	polysorbate80: {
+		label: "Polisorbato 80",
+		role: "Emulsionante",
+		pod: 0,
+		pac: 0,
+		solidsPercent: 100,
+		notes: "Mantiene la forma e rallenta la fusione del gelato.",
+		dosage: "0,02%–0,06%",
+	},
+	hazelnutPaste: {
+		label: "Pasta di nocciole",
+		role: "Aromatizzante, apporto grassi vegetali",
+		pod: null,
+		pac: -91,
+		solidsPercent: 100,
+		notes:
+			"~65% grassi vegetali; tende a indurire il gelato (PAC −91). PAC non ancora applicato in formula.",
+		dosage: "Gusto «frutta secca»: 100 g/kg (inclusione; non sposta il latte)",
+		formula: { gramsPerKg: 100 },
+	},
+	couverture70: {
+		label: "Copertura nera 70%",
+		role: "Aromatizzante, cremosità",
+		pod: null,
+		pac: -150,
+		solidsPercent: 100,
+		notes:
+			"~42,5% burro di cacao, 27,5% cacao puro; sapore intenso; PAC −150 (non ancora applicato in formula). Dose 170 g/kg ≈ stessa intensità aromatica di 60 g/kg cacao 22/24.",
+		dosage: "Gusto base bianca: 170 g/kg (sostituisce latte)",
+		formula: { gramsPerKg: 170 },
+	},
+	cocoaPowder: {
+		label: "Cacao (polvere)",
+		role: "Caratterizzazione aromatica, solidi",
+		pod: null,
+		pac: null,
+		solidsPercent: null,
+		notes:
+			"Residuo secco vegetale; struttura e aroma intenso. 60 g/kg di cacao 22/24 ≈ 4,68% cacao puro — dose equilibrata. Indurisce molto: impatto PAC ≈ cacao magro × 1,8 + burro di cacao × 0,9 (non ancora in formula).",
+		dosage: "Gusto base bianca 22/24: 60 g/kg (sostituisce latte)",
+		formula: {
+			gramsPerKg: 60,
+			cocoaLeanPacFactor: 1.8,
+			cocoaButterPacFactor: 0.9,
+		},
+	},
+	coconutOil: {
+		label: "Olio di cocco",
+		role: "Apporto grassi vegetali",
+		pod: 0,
+		pac: 0,
+		solidsPercent: 100,
+		notes:
+			"Grasso vegetale solido a basse temperature; influenza il punto di fusione.",
+		dosage: "~3,3% del mix",
+	},
+	salt: {
+		label: "Sale",
+		role: "Esalatore di sapore, anticongelante",
+		pod: null,
+		pac: 100,
+		solidsPercent: 100,
+		notes:
+			"Minerale; abbassa il punto di congelamento (PAC 100). In formula il PAC non è ancora applicato al bilancio.",
+		dosage:
+			"Creme dolci: 0,5 g/kg in formula (pratica comune, non un valore «fisso» nelle fonti). Creme salate: 4–8 g/kg.",
+		formula: {
+			gramsPerKg: 0.5,
+		},
+	},
+	sorbitol: {
+		label: "Sorbitolo",
+		role: "Emulsionante (polialcole)",
+		pod: null,
+		pac: null,
+		solidsPercent: null,
+		notes: "Non è uno zucchero; igroscopico; usi tecnici.",
+		dosage: "Max 1%",
+	},
+	wheyProtein: {
+		label: "Proteine del siero",
+		role: "Stabilizzante, effetto montante",
+		pod: null,
+		pac: null,
+		solidsPercent: null,
+		notes:
+			"Lattoalbumine/globuline; effetto montante superiore alla caseina; solubili.",
+		dosage: null,
+	},
+	lemonJuice: {
+		label: "Succo di limone",
+		role: "Acidificante, esaltatore di gusto",
+		pod: 5,
+		pac: 5,
+		solidsPercent: null,
+		notes:
+			"~5% zuccheri naturali; PAC/POD 5 per 100 g. Aggiungere a freddo (≤ 2–4°C) su basi al latte — a pH < 5 la caseina precipita.",
+		dosage:
+			"0 frutta acida/crema; 35 g/kg frutta dolce/sorbetto (+ extra opzionale). Xantano +25% ogni 2,5% di limone in miscela.",
+		formula: {
+			typicalGramsPerKg: 35,
+			stabilizerBump: 0.25,
+			lemonPercentPerXanthanStep: 2.5,
+		},
+	},
+	casein: {
+		label: "Caseina pura",
+		role: "Strutturante, overrun (consiglio)",
+		pod: null,
+		pac: null,
+		solidsPercent: null,
+		notes:
+			"Caseinati sodici spray. Compensa proteine disattivate dall'alcol; con cacao alleggerisce il mix. Precipita sotto pH 5 (o 4,5).",
+		dosage:
+			"Consiglio 20 g/kg con alcol (non in tabella ingredienti; disattivabile). Con frutta acida/limone: acido solo a freddo o in mantecatura.",
+		formula: {
+			gramsPerKg: 20,
+		},
+	},
+	alcohol: {
+		label: "Alcol",
+		role: "Anticongelante, aroma",
+		pod: 0,
+		pac: null,
+		solidsPercent: null,
+		notes:
+			"PAC = grammi di alcol puro per kg × 9. Preferisci saccarosio (evita destrosio/invertito ad alto PAC). +25% xantano.",
+		dosage:
+			"Opzionale; sposta latte/acqua e ribilancia gli zuccheri per riservare margine PAC.",
+		formula: { pacPerPureGram: 9, stabilizerBump: 0.25 },
+	},
 } as const;
 
-/** Relative POD (sweetening power); sucrose = 100. */
-export const POD_INDEX = {
-	sucrose: 100,
-	dextrose: 70,
-	invertedSugar: 130,
-	/** Honey ≈ invert sugar sweetness. */
-	honey: 130,
-	lactose: 16,
-	/** Lemon juice: 100 g → 5 POD on a 1 kg mix. */
-	lemonJuice: 5,
+export type IngredientDataKey = keyof typeof INGREDIENT_DATA;
+
+type NumOrRange = number | readonly [number, number];
+
+/** PAC/POD index used in generateRecipe. Prefer formula.* when pac/pod is a range. */
+export function formulaIndex(
+	key: IngredientDataKey,
+	field: "pac" | "pod",
+): number {
+	const e = INGREDIENT_DATA[key] as {
+		pac: NumOrRange | null;
+		pod: NumOrRange | null;
+		formula?: { pac?: number; pod?: number };
+	};
+	const override = e.formula?.[field];
+	if (override != null) return override;
+	const raw = e[field];
+	if (typeof raw === "number") return raw;
+	throw new Error(
+		`INGREDIENT_DATA.${key}: set formula.${field} (value is range or null)`,
+	);
+}
+
+/** Derived from INGREDIENT_DATA — used by lib/UI. */
+export const PAC_INDEX = {
+	sucrose: formulaIndex("sucrose", "pac"),
+	dextrose: formulaIndex("dextrose", "pac"),
+	invertedSugar: formulaIndex("invertedSugar", "pac"),
+	honey: formulaIndex("honey", "pac"),
+	fructose: formulaIndex("fructose", "pac"),
+	glucoseAtomized21DE: formulaIndex("glucoseAtomized21DE", "pac"),
+	glucoseAtomized42DE: formulaIndex("glucoseAtomized42DE", "pac"),
+	glucoseAtomized52DE: formulaIndex("glucoseAtomized52DE", "pac"),
+	maltose: formulaIndex("maltose", "pac"),
+	lactose: formulaIndex("lactose", "pac"),
+	wholeMilk: formulaIndex("wholeMilk", "pac"),
+	skimMilkPowder: formulaIndex("skimMilkPowder", "pac"),
+	cream35: formulaIndex("cream35", "pac"),
+	lemonJuice: formulaIndex("lemonJuice", "pac"),
+	salt: formulaIndex("salt", "pac"),
+	hazelnutPaste: formulaIndex("hazelnutPaste", "pac"),
+	couverture70: formulaIndex("couverture70", "pac"),
 } as const;
+
+export const POD_INDEX = {
+	sucrose: formulaIndex("sucrose", "pod"),
+	dextrose: formulaIndex("dextrose", "pod"),
+	invertedSugar: formulaIndex("invertedSugar", "pod"),
+	honey: formulaIndex("honey", "pod"),
+	fructose: formulaIndex("fructose", "pod"),
+	glucoseAtomized21DE: formulaIndex("glucoseAtomized21DE", "pod"),
+	glucoseAtomized42DE: formulaIndex("glucoseAtomized42DE", "pod"),
+	glucoseAtomized52DE: formulaIndex("glucoseAtomized52DE", "pod"),
+	maltose: formulaIndex("maltose", "pod"),
+	lactose: formulaIndex("lactose", "pod"),
+	trehalose: formulaIndex("trehalose", "pod"),
+	inulin: formulaIndex("inulin", "pod"),
+	lemonJuice: formulaIndex("lemonJuice", "pod"),
+} as const;
+
+export function formatIngredientNum(
+	v: number | readonly [number, number] | null | undefined,
+): string {
+	if (v == null) return "—";
+	if (typeof v === "number") return String(v);
+	return `${v[0]}–${v[1]}`;
+}
 
 /**
  * Sugar strategies. Default `blend` keeps KIND.sucroseShare (80/20 creams, 70/30 sorbet).
@@ -187,14 +642,14 @@ export const MIX_PROCEDURE = {
 
 /**
  * Pure alcohol grams × this = PAC points (per kg mix convention).
- * Rule: each alcoholic degree (≈ 1 g pure alcohol / kg) ≈ 9 PAC.
+ * From INGREDIENT_DATA.alcohol.formula.
  */
-export const ALCOHOL_PAC_PER_PURE_GRAM = 9;
+export const ALCOHOL_PAC_PER_PURE_GRAM =
+	INGREDIENT_DATA.alcohol.formula.pacPerPureGram;
 
 /** Recipe tweaks when alcohol is in the mix (casein is advice only — not auto-dosed). */
 export const ALCOHOL_MIX_TWEAKS = {
-	/** Increase neutro/stabilizer vs normal dose. */
-	stabilizerBump: 0.25,
+	stabilizerBump: INGREDIENT_DATA.alcohol.formula.stabilizerBump,
 	/** Prefer sucrose (PAC 100); avoid high-PAC sugars (dextrose, invert). */
 	preferSucrose: true,
 } as const;
@@ -204,7 +659,7 @@ export const ALCOHOL_MIX_TWEAKS = {
  * Toggle defaults on with alcohol; chocolate tip lives on flavor rows.
  */
 export const CASEIN_ADVICE = {
-	gramsPerKg: 20,
+	gramsPerKg: INGREDIENT_DATA.casein.formula.gramsPerKg,
 	alcoholTip:
 		"L'alcol disattiva le proteine e ostacola l'overrun; la caseina (caseinati sodici spray) compensa, trattiene l'alcol e mantiene la struttura sollevata.",
 	chocolateTip:
@@ -215,14 +670,13 @@ export const CASEIN_ADVICE = {
 
 /**
  * Lemon juice: displaces milk/water, tiny PAC/POD, acids cut stabilizer power.
- * Add cold (≤ 2–4°C) on milk mixes — casein precipitates below pH 5 when warm.
+ * From INGREDIENT_DATA.lemonJuice.formula.
  */
 export const LEMON_MIX_TWEAKS = {
-	/** +25% xanthan for each 2.5% of mix that is lemon juice. */
-	stabilizerBumpPerStep: 0.25,
-	lemonPercentPerStep: 2.5,
-	/** Typical dose when a sweet-fruit recipe calls for lemon (g/kg). */
-	typicalGramsPerKg: 35,
+	stabilizerBumpPerStep: INGREDIENT_DATA.lemonJuice.formula.stabilizerBump,
+	lemonPercentPerStep:
+		INGREDIENT_DATA.lemonJuice.formula.lemonPercentPerXanthanStep,
+	typicalGramsPerKg: INGREDIENT_DATA.lemonJuice.formula.typicalGramsPerKg,
 } as const;
 
 /**
@@ -257,7 +711,7 @@ export const KIND: Record<RecipeKind, KindParams> = {
 		sugarTotalFactor: 0.18,
 		fruitSugarFactor: 0.1,
 		pannaFactor: 0.12,
-		xanthanFactor: 0.0015,
+		xanthanFactor: INGREDIENT_DATA.xanthan.formula.factorByKind.fruit_acid,
 		lemonPerKg: 0,
 		liquid: "milk",
 		sucroseShare: 0.8,
@@ -267,8 +721,8 @@ export const KIND: Record<RecipeKind, KindParams> = {
 		sugarTotalFactor: 0.18,
 		fruitSugarFactor: 0.15,
 		pannaFactor: 0.12,
-		xanthanFactor: 0.0015,
-		lemonPerKg: 0.035,
+		xanthanFactor: INGREDIENT_DATA.xanthan.formula.factorByKind.fruit_sweet,
+		lemonPerKg: INGREDIENT_DATA.lemonJuice.formula.typicalGramsPerKg / 1000,
 		liquid: "milk",
 		sucroseShare: 0.8,
 	},
@@ -277,7 +731,7 @@ export const KIND: Record<RecipeKind, KindParams> = {
 		sugarTotalFactor: 0.18,
 		fruitSugarFactor: 0,
 		pannaFactor: 0.17,
-		xanthanFactor: 0.006,
+		xanthanFactor: INGREDIENT_DATA.xanthan.formula.factorByKind.cream,
 		lemonPerKg: 0,
 		liquid: "milk",
 		sucroseShare: 0.8,
@@ -287,8 +741,8 @@ export const KIND: Record<RecipeKind, KindParams> = {
 		sugarTotalFactor: 0.25,
 		fruitSugarFactor: 0.1,
 		pannaFactor: 0,
-		xanthanFactor: 0.005,
-		lemonPerKg: 0.035,
+		xanthanFactor: INGREDIENT_DATA.xanthan.formula.factorByKind.sorbet,
+		lemonPerKg: INGREDIENT_DATA.lemonJuice.formula.typicalGramsPerKg / 1000,
 		liquid: "water",
 		sucroseShare: 0.7,
 	},
@@ -329,6 +783,7 @@ export const INGREDIENT_ROWS = [
 	{ key: "invertedSugar", label: "Zucchero invertito" },
 	{ key: "honey", label: "Miele" },
 	{ key: "panna", label: "Panna (35%)" },
+	{ key: "eggYolk", label: "Tuorlo d'uovo" },
 	{ key: "water", label: "Acqua" },
 	{ key: "lemonJuice", label: "Succo di limone" },
 	{ key: "xanthan", label: "Xantano" },
@@ -387,14 +842,9 @@ export const FLAVOR_ROWS: {
 		note: "Aggiungi in mantecatura; valuta la riduzione zuccheri sotto",
 	},
 	{
-		key: "eggYolk",
-		label: "Tuorlo d'uovo (base uova)",
-		note: "Trasforma la base bianca in mantecato; sostituisci il latte",
-	},
-	{
 		key: "catalanaCaramel",
 		label: "Caramello crema catalana",
-		note: "Su base uova; aggiungi pezzi a fine mantecatura",
+		note: "Con base emulsionata al tuorlo; aggiungi pezzi a fine mantecatura",
 	},
 	{
 		key: "sugaryInclusionSugarCut",

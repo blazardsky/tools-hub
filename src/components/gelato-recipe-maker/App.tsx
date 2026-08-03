@@ -8,6 +8,7 @@ import {
 	FLAVOR_ROWS,
 	FRUIT_TO_TOTAL,
 	fieldClass,
+	INGREDIENT_DATA,
 	INGREDIENT_ROWS,
 	INVERT_SUGAR_HOWTO,
 	KIND_OPTIONS,
@@ -117,6 +118,8 @@ export default function App() {
 	const [extraWaterGrams, setExtraWaterGrams] = useState("");
 	const [addLemon, setAddLemon] = useState(false);
 	const [extraLemonGrams, setExtraLemonGrams] = useState("");
+	const [addEggYolk, setAddEggYolk] = useState(false);
+	const [eggYolkGrams, setEggYolkGrams] = useState("");
 
 	const isCream = kind === "cream";
 	const kindMeta = KIND_OPTIONS.find((o) => o.value === kind);
@@ -138,6 +141,7 @@ export default function App() {
 				extraPannaGrams: addPanna ? parseGrams(extraPannaGrams) : 0,
 				extraWaterGrams: addWater ? parseGrams(extraWaterGrams) : 0,
 				extraLemonGrams: addLemon ? parseGrams(extraLemonGrams) : 0,
+				eggYolkGrams: addEggYolk ? parseGrams(eggYolkGrams) : 0,
 			});
 		} catch {
 			return null;
@@ -158,6 +162,8 @@ export default function App() {
 		extraWaterGrams,
 		addLemon,
 		extraLemonGrams,
+		addEggYolk,
+		eggYolkGrams,
 	]);
 
 	const pac = result?.pac ?? null;
@@ -182,6 +188,8 @@ export default function App() {
 		setExtraWaterGrams("");
 		setAddLemon(false);
 		setExtraLemonGrams("");
+		setAddEggYolk(false);
+		setEggYolkGrams("");
 	};
 
 	return (
@@ -474,13 +482,13 @@ export default function App() {
 				<fieldset className="space-y-4">
 					<legend className={labelClass}>Additivi opzionali</legend>
 					<p className="text-sm text-[rgb(var(--text-muted))]">
-						Panna/acqua/limone extra spostano latte (o acqua). L'alcol sposta
+						Panna/acqua/limone/tuorlo spostano latte (o acqua). L'alcol sposta
 						liquido e ribilancia gli zuccheri (preferisci saccarosio), +
 						{ALCOHOL_MIX_TWEAKS.stabilizerBump * 100}% stabilizzante. Il limone
 						alza lo xantano del {LEMON_MIX_TWEAKS.stabilizerBumpPerStep * 100}%
 						ogni {LEMON_MIX_TWEAKS.lemonPercentPerStep}% di limone in miscela, e
-						va aggiunto a freddo se c'è latte. Con alcol si consiglia caseina
-						pura (disattivabile).
+						va aggiunto a freddo se c'è latte. Il tuorlo è emulsionante/neutro
+						(non un gusto). Con alcol si consiglia caseina pura (disattivabile).
 					</p>
 
 					<div className="space-y-3">
@@ -610,6 +618,39 @@ export default function App() {
 								hint={`PAC/POD ${PAC_INDEX.lemonJuice} per 100 g · sposta latte/acqua · xantano +${LEMON_MIX_TWEAKS.stabilizerBumpPerStep * 100}% ogni ${LEMON_MIX_TWEAKS.lemonPercentPerStep}% limone · tipico ~${LEMON_MIX_TWEAKS.typicalGramsPerKg} g/kg`}
 							/>
 						) : null}
+
+						<label className="flex items-center gap-2 text-sm">
+							<input
+								type="checkbox"
+								checked={addEggYolk}
+								onChange={(e) => {
+									const on = e.target.checked;
+									setAddEggYolk(on);
+									if (on && !eggYolkGrams.trim() && result) {
+										setEggYolkGrams(
+											String(
+												Math.round(
+													doseFor(
+														INGREDIENT_DATA.eggYolk.formula.gramsPerKg,
+														result.targetTotal,
+													),
+												),
+											),
+										);
+									}
+								}}
+							/>
+							Aggiungi tuorlo d'uovo (emulsionante)
+						</label>
+						{addEggYolk ? (
+							<NumberField
+								id="eggYolkGrams"
+								label="Tuorlo d'uovo"
+								value={eggYolkGrams}
+								onChange={setEggYolkGrams}
+								hint={`Neutro creme ${INGREDIENT_DATA.eggYolk.formula.neutroGramsPerKgMin}–${INGREDIENT_DATA.eggYolk.formula.neutroGramsPerKgMax} g/kg · 1 tuorlo ≈ ${INGREDIENT_DATA.eggYolk.formula.yolkGramsEach} g ≈ ${INGREDIENT_DATA.eggYolk.formula.neutroEquivalentPerYolkGrams} g neutro · min emulsione ${INGREDIENT_DATA.eggYolk.formula.minYolksPerKgForEmulsion} tuorli/kg · sposta latte/acqua`}
+							/>
+						) : null}
 					</div>
 				</fieldset>
 
@@ -710,8 +751,8 @@ export default function App() {
 							</div>
 						) : null}
 						<p className="text-sm text-[rgb(var(--text-muted))]">
-							Xantano max ≈ {TARGETS.xanthanMaxPercent}% della miscela — mescola
-							a secco con gli zuccheri prima dei liquidi.
+							Xantano max ≈ {INGREDIENT_DATA.xanthan.formula.maxPercent}% della
+							miscela — mescola a secco con gli zuccheri prima dei liquidi.
 						</p>
 
 						{pac ? (
@@ -803,7 +844,8 @@ export default function App() {
 					<p className="text-sm text-[rgb(var(--text-muted))]">
 						Dosi per {mixForFlavors} g di miscela. Gusti che si sciolgono:
 						sottrai lo stesso peso dal latte. Inclusioni: aggiungi durante/a
-						fine mantecatura.
+						fine mantecatura. Per il tuorlo (emulsionante/neutro) usa gli
+						additivi opzionali.
 					</p>
 					<table className="w-full border-collapse text-left text-base">
 						<thead>

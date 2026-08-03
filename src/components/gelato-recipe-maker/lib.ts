@@ -5,6 +5,7 @@ import {
 	ALCOHOL_MIX_TWEAKS,
 	ALCOHOL_PAC_PER_PURE_GRAM,
 	FRUIT_TO_TOTAL,
+	INGREDIENT_DATA,
 	KIND,
 	LEMON_MIX_TWEAKS,
 	PAC_INDEX,
@@ -162,6 +163,8 @@ export type RecipeInput = {
 	extraWaterGrams?: number;
 	/** Extra lemon juice beyond formula (displaces milk/water; xanthan scales with lemon %). */
 	extraLemonGrams?: number;
+	/** Egg yolk as emulsifier/neutro (displaces milk/water). */
+	eggYolkGrams?: number;
 };
 
 export type RecipeIngredients = {
@@ -176,6 +179,7 @@ export type RecipeIngredients = {
 	/** Formula water + optional extra. */
 	water: number;
 	lemonJuice: number;
+	eggYolk: number;
 	xanthan: number;
 	salt: number;
 	alcohol: number;
@@ -397,9 +401,10 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 	if (alcoholXanthanBump + lemonXanthanBump > 0) {
 		xanthan *= 1 + alcoholXanthanBump + lemonXanthanBump;
 	}
-	const salt = targetTotal * 0.0005; // 0.5 g/kg
+	const salt = (targetTotal * INGREDIENT_DATA.salt.formula.gramsPerKg) / 1000;
 	const extraPanna = Math.max(0, input.extraPannaGrams ?? 0);
 	const extraWater = Math.max(0, input.extraWaterGrams ?? 0);
+	const eggYolk = Math.max(0, input.eggYolkGrams ?? 0);
 
 	// Extras + alcohol count toward fixed weight so residual milk/water shrinks.
 	const fixed =
@@ -411,6 +416,7 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		formulaPanna +
 		extraPanna +
 		lemonJuice +
+		eggYolk +
 		xanthan +
 		salt +
 		alcohol +
@@ -429,6 +435,7 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		panna: round(formulaPanna + extraPanna),
 		water: round(formulaWater + extraWater),
 		lemonJuice: round(lemonJuice),
+		eggYolk: round(eggYolk),
 		xanthan: round(xanthan, 2),
 		salt: round(salt, 2),
 		alcohol: round(alcohol),
@@ -465,6 +472,15 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 	if (ingredients.lemonJuice > 0 && params.liquid === "milk") {
 		tips.push(
 			"Aggiungi il succo di limone solo a freddo (≤ 2–4°C), preferibilmente in mantecatura a miscela già maturata — a pH < 5 la caseina precipita (taglio del latte).",
+		);
+	}
+	if (eggYolk > 0) {
+		const yolkG = INGREDIENT_DATA.eggYolk.formula.yolkGramsEach;
+		const yolks = round(eggYolk / yolkG, 1);
+		const neutroEq =
+			yolks * INGREDIENT_DATA.eggYolk.formula.neutroEquivalentPerYolkGrams;
+		tips.push(
+			`Tuorlo: ≈ ${yolks} tuorli (≈ ${round(neutroEq, 1)} g neutro emulsionante). Coagula a ~65°C — non superare in pastorizzazione.`,
 		);
 	}
 
