@@ -1,3 +1,4 @@
+import "./global-polyfill";
 import convert from "convert-units";
 import {
 	CULINARY_ML,
