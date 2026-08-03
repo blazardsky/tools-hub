@@ -414,7 +414,7 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 			: input.kind === "cream"
 				? "cream"
 				: "fruit";
-	let neutroPerKg = nf.gramsPerKgByKind[kindKey];
+	let neutroPerKg: number = nf.gramsPerKgByKind[kindKey];
 	const isCreamOrFruit = kindKey === "cream" || kindKey === "fruit";
 	if (alcohol > 0 && isCreamOrFruit) {
 		neutroPerKg = nf.alcoholCreamGramsPerKg;
