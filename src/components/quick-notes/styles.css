@@ -1,0 +1,234 @@
+.qn-root {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+	min-height: 60vh;
+}
+
+.qn-editor-wrap {
+	flex: 1;
+	min-height: 50vh;
+	border: 1px solid var(--border);
+	padding: 0.75rem 1rem;
+}
+
+.qn-editor .tiptap {
+	min-height: 50vh;
+	outline: none;
+	padding: 0.25rem 0 2rem;
+	font-size: 1.05rem;
+	line-height: 1.65;
+	color: var(--foreground);
+}
+
+.qn-editor .tiptap p.is-editor-empty:first-child::before {
+	color: var(--muted-foreground);
+	content: attr(data-placeholder);
+	float: left;
+	height: 0;
+	pointer-events: none;
+}
+
+.qn-editor .tiptap h1 {
+	font-size: 1.9em;
+	font-weight: 700;
+	margin: 1.1em 0 0.4em;
+}
+
+.qn-editor .tiptap h2 {
+	font-size: 1.45em;
+	font-weight: 650;
+	margin: 1em 0 0.35em;
+}
+
+.qn-editor .tiptap h3 {
+	font-size: 1.2em;
+	font-weight: 600;
+	margin: 0.9em 0 0.3em;
+}
+
+.qn-editor .tiptap p {
+	margin: 0.4em 0;
+}
+
+.qn-editor .tiptap ul,
+.qn-editor .tiptap ol {
+	padding-left: 1.4em;
+	margin: 0.5em 0;
+}
+
+.qn-editor .tiptap ul[data-type="taskList"] {
+	list-style: none;
+	padding-left: 0.15em;
+}
+
+.qn-editor .tiptap ul[data-type="taskList"] li {
+	display: flex;
+	align-items: flex-start;
+	gap: 0.5em;
+}
+
+.qn-editor .tiptap ul[data-type="taskList"] li > label {
+	margin-top: 0.35em;
+}
+
+.qn-editor .tiptap ul[data-type="taskList"] li > div {
+	flex: 1;
+}
+
+.qn-editor .tiptap mark {
+	background-color: #fef08a;
+	border-radius: 0.15em;
+	padding: 0.05em 0.1em;
+	color: inherit;
+}
+
+.qn-editor .tiptap small {
+	font-size: 0.8em;
+}
+
+.qn-editor .tiptap a {
+	color: var(--primary);
+	text-decoration: underline;
+	text-underline-offset: 0.12em;
+}
+
+.qn-editor .tiptap sup.footnote-ref {
+	font-size: 0.75em;
+}
+
+.qn-editor .tiptap ol.footnotes {
+	margin-top: 1.5rem;
+	padding: 1rem 0 0 1.25rem;
+	list-style-type: decimal;
+	font-size: 0.9em;
+	color: var(--muted-foreground);
+}
+
+.qn-editor .tiptap ol.footnotes:has(li) {
+	border-top: 1px solid var(--border);
+}
+
+.qn-bubble {
+	display: flex;
+	gap: 0.15rem;
+	padding: 0.25rem;
+	border: 1px solid var(--border);
+	background: var(--background);
+	box-shadow: 0 4px 16px color-mix(in oklch, var(--foreground) 12%, transparent);
+}
+
+.qn-bubble button {
+	min-width: 1.75rem;
+	height: 1.75rem;
+	padding: 0 0.4rem;
+	border: none;
+	border-radius: 0;
+	background: transparent;
+	color: var(--foreground);
+	font: inherit;
+	font-size: 0.8rem;
+	cursor: pointer;
+}
+
+.qn-bubble button:hover,
+.qn-bubble button.is-active {
+	background: var(--muted);
+}
+
+.qn-footer {
+	position: sticky;
+	bottom: 0;
+	z-index: 20;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	width: 100vw;
+	margin-left: calc(50% - 50vw);
+	margin-top: 1rem;
+	padding: 0.2rem 1rem;
+	border-top: 1px solid var(--border);
+	background: var(--background);
+	font-size: 0.75rem;
+	line-height: 1.3;
+}
+
+.qn-footer-left {
+	display: flex;
+	align-items: center;
+	gap: 0.35rem;
+}
+
+.qn-footer-sep {
+	color: var(--muted-foreground);
+	user-select: none;
+}
+
+.qn-footer-status {
+	color: var(--muted-foreground);
+	text-align: right;
+}
+
+.qn-slash {
+	position: fixed;
+	z-index: 50;
+	min-width: 240px;
+	max-width: min(320px, calc(100vw - 1rem));
+	max-height: 280px;
+	overflow: auto;
+	padding: 0.25rem;
+	border: 1px solid var(--border);
+	background: var(--background);
+	box-shadow: 0 8px 24px color-mix(in oklch, var(--foreground) 14%, transparent);
+}
+
+.qn-slash-item {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0.1rem;
+	width: 100%;
+	padding: 0.4rem 0.55rem;
+	border: none;
+	background: transparent;
+	color: var(--foreground);
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.qn-slash-item:hover,
+.qn-slash-item.is-selected {
+	background: var(--muted);
+}
+
+.qn-slash-label {
+	font-size: 0.9rem;
+	font-weight: 600;
+}
+
+.qn-slash-desc {
+	font-size: 0.75rem;
+	color: var(--muted-foreground);
+}
+
+.qn-slash-empty {
+	padding: 0.5rem 0.55rem;
+	font-size: 0.85rem;
+	color: var(--muted-foreground);
+}
+
+/* Focus mode: hide hub chrome, keep editor + save bar.
+   !important beats Astro-scoped header/footer rules. */
+html.quick-notes-focus header,
+html.quick-notes-focus body > footer,
+html.quick-notes-focus #content > h1 {
+	/* biome-ignore lint/complexity/noImportantStyles: must override Astro scoped chrome */
+	display: none !important;
+}
+
+html.quick-notes-focus main {
+	padding-top: 1.25em;
+	padding-bottom: 0.5em;
+}

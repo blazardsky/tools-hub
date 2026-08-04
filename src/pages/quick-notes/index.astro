@@ -1,0 +1,14 @@
+---
+import App from "@components/quick-notes/App";
+import ToolLayout from "@layouts/ToolLayout.astro";
+
+const title = "Quick Notes";
+---
+
+<ToolLayout
+  title={title}
+  description="A fast TipTap notepad that saves in your browser."
+>
+  <h1>{title}</h1>
+  <App client:load />
+</ToolLayout>

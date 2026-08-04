@@ -16,18 +16,18 @@ A collection of client-side tools for various uses. I made it for things i neede
 
 ### Gelato Recipe Maker
 
-| Status           | URL                                                                   | Description                                                  | Why                             |
-| ---------------- | --------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------- |
-| Work in progress | [gelato-recipe-maker](https://tools.nicc-olo.com/gelato-recipe-maker) | A form to generate quantities (in grams) for gelato recipes. | I use it to make gelato at home |
+| Status  | URL                                                                   | Description                                                  | Why                             |
+| ------- | --------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------- |
+| Working | [gelato-recipe-maker](https://tools.nicc-olo.com/gelato-recipe-maker) | A form to generate quantities (in grams) for gelato recipes. | I use it to make gelato at home |
 
-### Markdown Notes
+### Quick Notes
 
-| Status          | URL                                                         | Description                                                   | Why                                                                                                                    |
-| --------------- | ----------------------------------------------------------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Not yet started | [markdown-notes](https://tools.nicc-olo.com/markdown-notes) | A minimal interface to write some notes and save as markdwon. | I keep opening web pages searching for somewhere to write quickly a note or an idea or just to save a link temporarily |
+| Status  | URL                                                   | Description                                           | Why                                                                                                                    |
+| ------- | ----------------------------------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Working | [quick-notes](https://tools.nicc-olo.com/quick-notes) | A fast TipTap notepad that saves TipTap JSON locally. | I keep opening web pages searching for somewhere to write quickly a note or an idea or just to save a link temporarily |
 
 ### Recipe Converter
 
-| Status          | URL                                                             | Description                                                            | Why                     |
-| --------------- | --------------------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------- |
-| Not yet started | [recipe-converter](https://tools.nicc-olo.com/recipe-converter) | A form to quickly convert a recipe for n people into one for m people. | Requested from a friend |
+| Status  | URL                                                             | Description                                                            | Why                     |
+| ------- | --------------------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------- |
+| Working | [recipe-converter](https://tools.nicc-olo.com/recipe-converter) | A form to quickly convert a recipe for n people into one for m people. | Requested from a friend |
