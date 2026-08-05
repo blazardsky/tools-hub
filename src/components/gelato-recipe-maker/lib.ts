@@ -10,11 +10,14 @@ import {
 	PAC_INDEX,
 	POD_INDEX,
 	type RecipeKind,
+	type RicottaMilk,
 	SERVICE_TEMP,
 	type ServiceTempKey,
 	SUGAR_MODES,
 	type SugarMode,
 	saltGramsPerKg,
+	TARGETS,
+	usesTotalGrams,
 } from "./const";
 
 /** Scale a per-kg dose to an arbitrary mix weight. */
@@ -149,9 +152,9 @@ export function computePacBalance(opts: {
 
 export type RecipeInput = {
 	kind: RecipeKind;
-	/** Fruit weight (g). Required for fruit_* and sorbet; ignored for cream. */
+	/** Fruit weight (g). Required for fruit_* and sorbet; ignored for cream/yogurt/ricotta. */
 	fruitGrams?: number;
-	/** Desired mix weight (g). Required for cream; otherwise = fruit × 2.2. */
+	/** Desired mix weight (g). Required for cream/yogurt/ricotta; otherwise = fruit × 2.2. */
 	totalGrams?: number;
 	/** Service temperature — scales sugars so mix PAC hits the target. */
 	tempKey?: ServiceTempKey;
@@ -173,11 +176,28 @@ export type RecipeInput = {
 	savory?: boolean;
 	/** Absolute salt grams when savory (optional; otherwise formula default for kind). */
 	saltGrams?: number;
+	/** Yogurt MG % (yogurt kind). Scales panna toward ~5% fat mix. */
+	yogurtFatPercent?: number;
+	/** Strained Greek yogurt (yogurt kind) — tip / label; same 50% dose. */
+	greekYogurt?: boolean;
+	/** Ricotta % of mix (ricotta kind; typically 15–25). */
+	ricottaPercent?: number;
+	/** Ricotta milk type — sets composition defaults. */
+	ricottaMilk?: RicottaMilk;
+	/** Ricotta fat % (MG). */
+	ricottaFatPercent?: number;
+	/** Ricotta solids non-fat % (SLNG). */
+	ricottaSlngPercent?: number;
+	/** Ricotta total solids %. */
+	ricottaSolidsPercent?: number;
 };
 
 export type RecipeIngredients = {
 	fruit: number;
+	yogurt: number;
+	ricotta: number;
 	milk: number;
+	skimMilkPowder: number;
 	sucrose: number;
 	dextrose: number;
 	invertedSugar: number;
@@ -254,10 +274,10 @@ function resolveTargetTotal(input: RecipeInput): {
 	fruit: number;
 	targetTotal: number;
 } {
-	if (input.kind === "cream") {
+	if (usesTotalGrams(input.kind)) {
 		const targetTotal = input.totalGrams ?? 0;
 		if (targetTotal <= 0) {
-			throw new Error("cream recipes need totalGrams > 0");
+			throw new Error(`${input.kind} recipes need totalGrams > 0`);
 		}
 		return { fruit: 0, targetTotal };
 	}
@@ -266,6 +286,59 @@ function resolveTargetTotal(input: RecipeInput): {
 		throw new Error(`${input.kind} recipes need fruitGrams > 0`);
 	}
 	return { fruit, targetTotal: fruit * FRUIT_TO_TOTAL };
+}
+
+/**
+ * Panna (g) so dairy fat + cream + residual milk ≈ target mix fat %.
+ * milk = target − fixedWithoutPanna − panna.
+ */
+function pannaForMixFat(opts: {
+	targetTotal: number;
+	dairyGrams: number;
+	dairyFatPercent: number;
+	fixedWithoutPanna: number;
+	targetMixFatPercent: number;
+	creamFatPercent: number;
+	milkFatPercent: number;
+}): number {
+	const T = opts.targetTotal;
+	const df = opts.dairyFatPercent / 100;
+	const cf = opts.creamFatPercent / 100;
+	const mf = opts.milkFatPercent / 100;
+	const targetFat = (opts.targetMixFatPercent / 100) * T;
+	const dairyFat = opts.dairyGrams * df;
+	// targetFat = dairyFat + panna*cf + (T - fixed - panna)*mf
+	const denom = cf - mf;
+	if (denom <= 0) return 0;
+	const panna =
+		(targetFat - dairyFat - (T - opts.fixedWithoutPanna) * mf) / denom;
+	return Math.max(0, panna);
+}
+
+/** LMP (g) so ricotta SLNG + milk SNF + LMP ≈ target mix SLNG (LMP displaces milk). */
+function lmpForMixSlng(opts: {
+	targetTotal: number;
+	ricottaGrams: number;
+	ricottaSlngPercent: number;
+	/** Mix weight already allocated (no milk, no LMP). */
+	fixedWithoutMilkOrLmp: number;
+	targetMixSlngPercent: number;
+	milkSlngPercent: number;
+	lmpSolidsPercent: number;
+	maxGramsPerKg: number;
+}): number {
+	const T = opts.targetTotal;
+	const milk0 = Math.max(0, T - opts.fixedWithoutMilkOrLmp);
+	const rSlng = opts.ricottaGrams * (opts.ricottaSlngPercent / 100);
+	const ms = opts.milkSlngPercent / 100;
+	const ls = opts.lmpSolidsPercent / 100;
+	const target = (opts.targetMixSlngPercent / 100) * T;
+	// target = rSlng + (milk0 - lmp)*ms + lmp*ls
+	const denom = ls - ms;
+	if (denom <= 0) return 0;
+	const lmp = (target - rSlng - milk0 * ms) / denom;
+	const maxG = doseFor(opts.maxGramsPerKg, T);
+	return Math.max(0, Math.min(maxG, lmp));
 }
 
 /**
@@ -402,7 +475,33 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 	const invertedSugar = mode.useInvert && !preferSucrose ? scaled.highPac : 0;
 	const honey = mode.useHoney && !preferSucrose ? scaled.highPac : 0;
 
-	const formulaPanna = targetTotal * params.pannaFactor;
+	const yogurt = targetTotal * params.yogurtFactor;
+	const rf = INGREDIENT_DATA.ricotta.formula;
+	const ricottaMilk: RicottaMilk = input.ricottaMilk ?? "cow";
+	const ricottaPreset = rf[ricottaMilk];
+	const ricottaFraction =
+		input.kind === "ricotta"
+			? Math.min(
+					rf.maxFraction,
+					Math.max(
+						rf.minFraction,
+						(input.ricottaPercent ?? rf.fractionOfMix * 100) / 100,
+					),
+				)
+			: 0;
+	const ricotta = targetTotal * ricottaFraction;
+	const ricottaFatPercent = Math.max(
+		0,
+		input.ricottaFatPercent ?? ricottaPreset.fatPercent,
+	);
+	const ricottaSlngPercent = Math.max(
+		0,
+		input.ricottaSlngPercent ?? ricottaPreset.slngPercent,
+	);
+	const ricottaSolidsPercent = Math.max(
+		0,
+		input.ricottaSolidsPercent ?? ricottaPreset.solidsPercent,
+	);
 	const extraLemon = Math.max(0, input.extraLemonGrams ?? 0);
 	const lemonJuice = targetTotal * params.lemonPerKg + extraLemon;
 	const eggYolk = Math.max(0, input.eggYolkGrams ?? 0);
@@ -413,11 +512,19 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 			? "sorbet"
 			: input.kind === "cream"
 				? "cream"
-				: "fruit";
+				: input.kind === "yogurt"
+					? "yogurt"
+					: input.kind === "ricotta"
+						? "ricotta"
+						: "fruit";
 	let neutroPerKg: number = nf.gramsPerKgByKind[kindKey];
-	const isCreamOrFruit = kindKey === "cream" || kindKey === "fruit";
-	if (alcohol > 0 && isCreamOrFruit) {
-		neutroPerKg = nf.alcoholCreamGramsPerKg;
+	const isDairyWithAlcoholBump =
+		kindKey === "cream" ||
+		kindKey === "fruit" ||
+		kindKey === "yogurt" ||
+		kindKey === "ricotta";
+	if (alcohol > 0 && isDairyWithAlcoholBump) {
+		neutroPerKg = Math.max(neutroPerKg, nf.alcoholCreamGramsPerKg);
 	}
 	const hasAcid = input.kind === "fruit_acid" || lemonJuice > 0;
 	const acidApplied = hasAcid;
@@ -432,28 +539,93 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 	const extraPanna = Math.max(0, input.extraPannaGrams ?? 0);
 	const extraWater = Math.max(0, input.extraWaterGrams ?? 0);
 
-	// Extras + alcohol count toward fixed weight so residual milk/water shrinks.
-	const fixed =
+	const greekYogurt = input.greekYogurt ?? false;
+	const yf = INGREDIENT_DATA.yogurt.formula;
+	const yogurtFatPercent = Math.max(
+		0,
+		input.yogurtFatPercent ??
+			(greekYogurt ? yf.greekDefaultFatPercent : yf.defaultFatPercent),
+	);
+
+	const fixedCore =
 		fruit +
+		yogurt +
+		ricotta +
 		sucrose +
 		dextrose +
 		invertedSugar +
 		honey +
-		formulaPanna +
-		extraPanna +
 		lemonJuice +
 		eggYolk +
 		neutro +
 		salt +
 		alcohol +
 		extraWater;
+
+	const formulaPannaBase =
+		input.kind === "yogurt"
+			? pannaForMixFat({
+					targetTotal,
+					dairyGrams: yogurt,
+					dairyFatPercent: yogurtFatPercent,
+					fixedWithoutPanna: fixedCore,
+					targetMixFatPercent: yf.targetMixFatPercent,
+					creamFatPercent: yf.creamFatPercent,
+					milkFatPercent: yf.milkFatPercent,
+				})
+			: input.kind === "ricotta"
+				? pannaForMixFat({
+						targetTotal,
+						dairyGrams: ricotta,
+						dairyFatPercent: ricottaFatPercent,
+						fixedWithoutPanna: fixedCore,
+						targetMixFatPercent: rf.targetMixFatPercent,
+						creamFatPercent: rf.creamFatPercent,
+						milkFatPercent: rf.milkFatPercent,
+					})
+				: targetTotal * params.pannaFactor;
+
+	const lmpF = INGREDIENT_DATA.skimMilkPowder.formula;
+	const skimMilkPowder =
+		input.kind === "ricotta"
+			? lmpForMixSlng({
+					targetTotal,
+					ricottaGrams: ricotta,
+					ricottaSlngPercent,
+					fixedWithoutMilkOrLmp: fixedCore + formulaPannaBase + extraPanna,
+					targetMixSlngPercent: lmpF.targetMixSlngPercent,
+					milkSlngPercent: lmpF.milkSlngPercent,
+					lmpSolidsPercent: lmpF.solidsPercent,
+					maxGramsPerKg: lmpF.maxGramsPerKg,
+				})
+			: 0;
+
+	// Recompute panna with LMP in the fixed weight (LMP displaces milk fat).
+	const formulaPanna =
+		input.kind === "ricotta" && skimMilkPowder > 0
+			? pannaForMixFat({
+					targetTotal,
+					dairyGrams: ricotta,
+					dairyFatPercent: ricottaFatPercent,
+					fixedWithoutPanna: fixedCore + skimMilkPowder,
+					targetMixFatPercent: rf.targetMixFatPercent,
+					creamFatPercent: rf.creamFatPercent,
+					milkFatPercent: rf.milkFatPercent,
+				})
+			: formulaPannaBase;
+
+	// Extras + alcohol count toward fixed weight so residual milk/water shrinks.
+	const fixed = fixedCore + formulaPanna + extraPanna + skimMilkPowder;
 	const residual = Math.max(0, targetTotal - fixed);
 	const milk = params.liquid === "milk" ? residual : 0;
 	const formulaWater = params.liquid === "water" ? residual : 0;
 
 	const ingredients: RecipeIngredients = {
 		fruit: round(fruit),
+		yogurt: round(yogurt),
+		ricotta: round(ricotta),
 		milk: round(milk),
+		skimMilkPowder: round(skimMilkPowder),
 		sucrose: round(sucrose),
 		dextrose: round(dextrose),
 		invertedSugar: round(invertedSugar),
@@ -493,7 +665,11 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 	{
 		const baseKg = nf.gramsPerKgByKind[kindKey];
 		const parts: string[] = [`base ${baseKg} g/kg`];
-		if (alcohol > 0 && isCreamOrFruit) {
+		if (
+			alcohol > 0 &&
+			isDairyWithAlcoholBump &&
+			baseKg < nf.alcoholCreamGramsPerKg
+		) {
 			parts.push(`alcol → ${nf.alcoholCreamGramsPerKg} g/kg`);
 		}
 		if (acidApplied) parts.push(`acido ×${1 + nf.acidBump}`);
@@ -505,6 +681,31 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		}
 		tips.push(
 			`Neutro: ${ingredients.neutro} g (${parts.join("; ")}). Mescola a secco con ~10× saccarosio; attiva a 82–85°C.`,
+		);
+	}
+	if (ingredients.yogurt > 0) {
+		const kindLabel = greekYogurt ? "Yogurt greco" : "Yogurt";
+		tips.push(
+			`${kindLabel}: ${ingredients.yogurt} g (50% · ${yogurtFatPercent}% MG). Incorpora solo a ≤ 4°C dopo pastorizzazione — non scaldare (pH 4,2–4,6; fermenti e caseina). Panna bilanciata per grassi mix ~${yf.targetMixFatPercent}% (range ${TARGETS.fatsYogurt.min}–${TARGETS.fatsYogurt.max}%).${greekYogurt ? " Greco: più solidi/proteine, meno siero." : ""}`,
+		);
+	}
+	if (ingredients.ricotta > 0) {
+		const milkLabel = ricottaMilk === "sheep" ? "pecora" : "vaccina";
+		const solidsSum = ricottaFatPercent + ricottaSlngPercent;
+		const solidsNote =
+			Math.abs(ricottaSolidsPercent - solidsSum) > 1
+				? ` Attenzione: solidi totali (${ricottaSolidsPercent}%) ≠ MG+SLNG (${round(solidsSum, 1)}%).`
+				: "";
+		tips.push(
+			`Ricotta ${milkLabel}: ${ingredients.ricotta} g (${round(ricottaFraction * 100, 0)}% · MG ${ricottaFatPercent}% · SLNG ${ricottaSlngPercent}% · solidi ${ricottaSolidsPercent}%). Aggiungi a freddo in mantecatura; omogeneizza col mixer. Panna bilanciata per ~${rf.targetMixFatPercent}% grassi.${solidsNote}`,
+		);
+		if (ingredients.skimMilkPowder > 0) {
+			tips.push(
+				`LMP: ${ingredients.skimMilkPowder} g (SLNG mix obiettivo ~${lmpF.targetMixSlngPercent}%; max ${lmpF.maxGramsPerKg} g/kg). Favorisce overrun (~35% tipico con ricotta).`,
+			);
+		}
+		tips.push(
+			`Inclusioni (fichi, cioccolato, …): ~${rf.inclusionGramsPerKg} g/kg a fine mantecatura; canditi/caramellati ammorbidiscono (zuccheri extra).`,
 		);
 	}
 	if (ingredients.lemonJuice > 0 && params.liquid === "milk") {

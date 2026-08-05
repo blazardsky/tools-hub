@@ -7,7 +7,11 @@ export const TARGETS = {
 	fruitPercent: { min: 35, max: 50 },
 	sugarsCream: { min: 18, max: 22 },
 	sugarsSorbet: { min: 25, max: 30 },
-	fatsCream: { min: 4, max: 6 },
+	fatsCream: { min: 6, max: 10 },
+	/** Yogurt base: lower fat so yogurt aroma isn’t masked. */
+	fatsYogurt: { min: 4, max: 6 },
+	/** Ricotta / fresh cheese in mix. */
+	ricottaPercent: { min: 15, max: 25 },
 } as const;
 
 /**
@@ -236,6 +240,14 @@ export const INGREDIENT_DATA = {
 		solidsPercent: [95, 100] as const,
 		notes: "Proteine 36–38%, lattosio 50–51%; favorisce l'overrun.",
 		dosage: "Max 10% del mix; SLNG tra 7,5% e 11,5%",
+		formula: {
+			solidsPercent: 96,
+			maxGramsPerKg: 100,
+			/** Mix SLNG target mid-range for overrun/structure. */
+			targetMixSlngPercent: 9.5,
+			/** Approx SNF of whole milk. */
+			milkSlngPercent: 9,
+		},
 	},
 	cream35: {
 		label: "Panna (35–40% MG)",
@@ -244,9 +256,53 @@ export const INGREDIENT_DATA = {
 		pac: 3,
 		solidsPercent: [40, 50] as const,
 		notes:
-			"Emulsione di grassi lattei; untuosità, palatabilità e resistenza alla fusione. I grassi non influenzano direttamente il PAC (non sono in soluzione vera, ma in emulsione). Target grassi totali ideale ~8% (range 6–10%); creme alla frutta 4–6% per non coprire il frutto; sorbetti 0%.",
+			"Emulsione di grassi lattei; untuosità, palatabilità e resistenza alla fusione. I grassi non influenzano direttamente il PAC (non sono in soluzione vera, ma in emulsione). Target grassi totali ideale ~8% (range 6–10%); creme alla frutta / yogurt 4–6% per non coprire aroma e freschezza; sorbetti 0%.",
 		dosage:
-			"Formula: 12% frutta / 17% base bianca / 0% sorbetto (+ extra opzionale). Obiettivo grassi mix ~8% (6–10%); frutta 4–6%.",
+			"Formula: 12% frutta / 17% base bianca / 6% yogurt / panna ridotta con ricotta / 0% sorbetto (+ extra opzionale). Obiettivo grassi mix ~8% (6–10%); frutta/yogurt 4–6%.",
+	},
+	yogurt: {
+		label: "Yogurt",
+		role: "Gusto e acidità; sostituisce gran parte del latte",
+		pod: null,
+		pac: null,
+		solidsPercent: [12, 15] as const,
+		notes:
+			"~85–88% acqua, pH 4,2–4,6. A pH < 5 la caseina del latte precipita («taglio») se scaldato — non riscaldare mai lo yogurt. Dose ideale 50% della miscela (500 g/kg) per sapore intenso. Conserva i fermenti lattici solo a freddo.",
+		dosage:
+			"500 g/kg (50% della miscela); incorpora solo a ≤ 4°C dopo pastorizzazione",
+		formula: {
+			fractionOfMix: 0.5,
+			/** Default MG % if user doesn’t override. */
+			defaultFatPercent: 3.5,
+			greekDefaultFatPercent: 5,
+			/** Mid of TARGETS.fatsYogurt — panna scales to hit this. */
+			targetMixFatPercent: 5,
+			creamFatPercent: 35,
+			milkFatPercent: 3.6,
+		},
+	},
+	ricotta: {
+		label: "Ricotta",
+		role: "Gusto formaggio fresco; grassi, SLNG e solidi totali",
+		pod: null,
+		pac: null,
+		solidsPercent: [20, 30] as const,
+		notes:
+			"Non pastorizzare con la base: aggiungi a freddo in mantecatura (o dopo maturazione), poi omogeneizza con mixer. Proteine utili all'overrun (~35%). Vaccina tipica 10–13% MG; pecora 15–20%. Dose 15–25% della miscela.",
+		dosage:
+			"150–250 g/kg (15–25%); a freddo dopo maturazione; mixer prima della gelatiera",
+		formula: {
+			fractionOfMix: 0.2,
+			minFraction: 0.15,
+			maxFraction: 0.25,
+			/** Keep cream ideal ~8%; panna drops as ricotta fat rises. */
+			targetMixFatPercent: 8,
+			creamFatPercent: 35,
+			milkFatPercent: 3.6,
+			cow: { fatPercent: 11, slngPercent: 11, solidsPercent: 22 },
+			sheep: { fatPercent: 17, slngPercent: 12, solidsPercent: 29 },
+			inclusionGramsPerKg: 100,
+		},
 	},
 	butter: {
 		label: "Burro",
@@ -286,11 +342,13 @@ export const INGREDIENT_DATA = {
 		notes:
 			"Pesatura precisa. Mescola a secco con ~10× saccarosio; attiva a 82–85°C. Il tuorlo sostituisce ~2 g di neutro per tuorlo.",
 		dosage:
-			"6 g/kg crema · 7 g/kg frutta · 5 g/kg sorbetto; ×1,25 se acido; alcol+crema/frutta → 8 g/kg; alcol+sorbetto → ×1,25",
+			"6 g/kg crema · 7 g/kg frutta · 8 g/kg yogurt/ricotta · 5 g/kg sorbetto; ×1,25 se acido; alcol+crema/frutta → 8 g/kg; alcol+sorbetto → ×1,25",
 		formula: {
 			gramsPerKgByKind: {
 				cream: 6,
 				fruit: 7,
+				yogurt: 8,
+				ricotta: 8,
 				sorbet: 5,
 			},
 			alcoholCreamGramsPerKg: 8,
@@ -670,6 +728,82 @@ export const MIX_PROCEDURE = {
 	],
 } as const;
 
+/** Yogurt base: pasteurize dairy without yogurt, then fold yogurt in cold. */
+export const YOGURT_PROCEDURE = {
+	title: "Procedura base yogurt",
+	stages: [
+		{
+			title: "1. Base calda (senza yogurt)",
+			points: [
+				"Prima i liquidi freddi: latte e panna — non lo yogurt.",
+				"Incorpora le polveri (zuccheri) a freddo; agita per evitare grumi.",
+				"Neutro a 8 g/kg (miscela più fragile con grassi bassi): mescola a secco con ~10× saccarosio, poi con le altre polveri a freddo.",
+			],
+		},
+		{
+			title: "2. Pastorizzazione 82–85°C",
+			points: [
+				"Porta solo la base (latte, panna, zuccheri, neutro) a 82–85°C; raffredda subito.",
+				"Attiva il neutro, emulsiona i grassi e idrata le proteine — senza yogurt in pentola.",
+			],
+		},
+		{
+			title: "3. Raffreddamento rapido → ≤ 4°C",
+			points: [
+				"Raffredda il più in fretta possibile sotto 4°C (finestra batterica 45°C → 15°C).",
+			],
+		},
+		{
+			title: "4. Yogurt a freddo (50% della miscela)",
+			points: [
+				"Incorpora lo yogurt solo a miscela ≤ 4°C — non scaldarlo mai (pH 4,2–4,6; sotto pH 5 la caseina «taglia»).",
+				"500 g/kg (~85–88% acqua) sostituiscono gran parte del latte della base bianca e conservano i fermenti lattici.",
+				"Grassi totali obiettivo 4–6% (panna drasticamente ridotta vs ~170 g/kg della base bianca) per non coprire aroma e freschezza.",
+			],
+		},
+		{
+			title: "5. Maturazione e mantecatura",
+			points: ["Matura 6–12 h a 4°C, poi manteca a ≤ 4°C."],
+		},
+	],
+} as const;
+
+/** Ricotta: pasteurize base without cheese, mature, then cold-blend ricotta before churn. */
+export const RICOTTA_PROCEDURE = {
+	title: "Procedura base formaggio (ricotta)",
+	stages: [
+		{
+			title: "1. Base bianca (senza ricotta)",
+			points: [
+				"Mescola latte, panna, zuccheri, LMP e neutro — non la ricotta.",
+				"Neutro a 8 g/kg (creme poco grasse): mescola a secco con ~10× saccarosio, poi con le altre polveri a freddo.",
+			],
+		},
+		{
+			title: "2. Pastorizzazione 85°C e maturazione",
+			points: [
+				"Porta la base a 82–85°C; raffredda rapidamente a 4°C.",
+				"Matura in frigo 6–12 h a 4°C.",
+			],
+		},
+		{
+			title: "3. Ricotta a freddo (in mantecatura)",
+			points: [
+				"Unisci la ricotta di frigo solo al momento di mantecare — non pastorizzarla (sapore e grana).",
+				"Dose tipica 15–25% della miscela (150–250 g/kg).",
+				"Passa il mix con frullatore a immersione prima della gelatiera per una struttura liscia senza grumi.",
+			],
+		},
+		{
+			title: "4. Mantecazione e inclusioni",
+			points: [
+				"Manteca a ≤ 4°C. Overrun tipico ~35% grazie alle proteine della ricotta.",
+				"Fichi, gocce di cioccolato o simili (~100 g/kg): a fine mantecatura. Canditi/caramellati apportano zuccheri extra (gelato più morbido).",
+			],
+		},
+	],
+} as const;
+
 /**
  * Pure alcohol grams × this = PAC points (per kg mix convention).
  * From INGREDIENT_DATA.alcohol.formula.
@@ -721,7 +855,15 @@ export const LACTOSE_FREE = {
 	sugarCutFraction: 0.1,
 } as const;
 
-export type RecipeKind = "fruit_acid" | "fruit_sweet" | "cream" | "sorbet";
+export type RecipeKind =
+	| "fruit_acid"
+	| "fruit_sweet"
+	| "cream"
+	| "yogurt"
+	| "ricotta"
+	| "sorbet";
+
+export type RicottaMilk = "cow" | "sheep";
 
 /** Salt dose g/kg: sweet ~0.5; savory cream 4 (range 4–8); savory sorbet 8. */
 export function saltGramsPerKg(savory: boolean, kind: RecipeKind): number {
@@ -730,10 +872,17 @@ export function saltGramsPerKg(savory: boolean, kind: RecipeKind): number {
 	return kind === "sorbet" ? f.gramsPerKgSavorySorbet : f.gramsPerKgSavoryCream;
 }
 
+/** Cream / yogurt / ricotta: user sets mix weight; fruit kinds scale from fruit × FRUIT_TO_TOTAL. */
+export function usesTotalGrams(kind: RecipeKind): boolean {
+	return kind === "cream" || kind === "yogurt" || kind === "ricotta";
+}
+
 type KindParams = {
 	sugarTotalFactor: number;
 	fruitSugarFactor: number;
 	pannaFactor: number;
+	/** Fixed yogurt fraction of mix (yogurt kind only). */
+	yogurtFactor: number;
 	lemonPerKg: number;
 	/** Creams use milk residual; sorbets use water residual. */
 	liquid: "milk" | "water";
@@ -747,6 +896,7 @@ export const KIND: Record<RecipeKind, KindParams> = {
 		sugarTotalFactor: 0.18,
 		fruitSugarFactor: 0.1,
 		pannaFactor: 0.12,
+		yogurtFactor: 0,
 		lemonPerKg: 0,
 		liquid: "milk",
 		sucroseShare: 0.8,
@@ -756,6 +906,7 @@ export const KIND: Record<RecipeKind, KindParams> = {
 		sugarTotalFactor: 0.18,
 		fruitSugarFactor: 0.15,
 		pannaFactor: 0.12,
+		yogurtFactor: 0,
 		lemonPerKg: INGREDIENT_DATA.lemonJuice.formula.typicalGramsPerKg / 1000,
 		liquid: "milk",
 		sucroseShare: 0.8,
@@ -765,6 +916,28 @@ export const KIND: Record<RecipeKind, KindParams> = {
 		sugarTotalFactor: 0.18,
 		fruitSugarFactor: 0,
 		pannaFactor: 0.17,
+		yogurtFactor: 0,
+		lemonPerKg: 0,
+		liquid: "milk",
+		sucroseShare: 0.8,
+	},
+	// Base yogurt — 50% yogurt, panna from yogurt MG, higher neutro, cold-add only
+	yogurt: {
+		sugarTotalFactor: 0.18,
+		fruitSugarFactor: 0,
+		/** Fallback if fat inputs missing; normally overridden by yogurt MG. */
+		pannaFactor: 0.06,
+		yogurtFactor: INGREDIENT_DATA.yogurt.formula.fractionOfMix,
+		lemonPerKg: 0,
+		liquid: "milk",
+		sucroseShare: 0.8,
+	},
+	// Base ricotta — cheese % + composition drive panna/LMP; neutro 8; cold-add
+	ricotta: {
+		sugarTotalFactor: 0.18,
+		fruitSugarFactor: 0,
+		pannaFactor: 0.04,
+		yogurtFactor: 0,
 		lemonPerKg: 0,
 		liquid: "milk",
 		sucroseShare: 0.8,
@@ -774,6 +947,7 @@ export const KIND: Record<RecipeKind, KindParams> = {
 		sugarTotalFactor: 0.25,
 		fruitSugarFactor: 0.1,
 		pannaFactor: 0,
+		yogurtFactor: 0,
 		lemonPerKg: INGREDIENT_DATA.lemonJuice.formula.typicalGramsPerKg / 1000,
 		liquid: "water",
 		sucroseShare: 0.7,
@@ -801,6 +975,16 @@ export const KIND_OPTIONS: {
 		hint: "Senza frutta — imposta il peso desiderato della miscela",
 	},
 	{
+		value: "yogurt",
+		label: "Base yogurt",
+		hint: "50% yogurt a freddo · grassi 4–6% · neutro 8 g/kg",
+	},
+	{
+		value: "ricotta",
+		label: "Base formaggio (ricotta)",
+		hint: "15–25% ricotta a freddo · grassi ~8% · LMP · neutro 8 g/kg",
+	},
+	{
 		value: "sorbet",
 		label: "Sorbetto",
 		hint: "Base frutta + acqua, zuccheri più alti",
@@ -809,7 +993,10 @@ export const KIND_OPTIONS: {
 
 export const INGREDIENT_ROWS = [
 	{ key: "fruit", label: "Frutta" },
+	{ key: "yogurt", label: "Yogurt" },
+	{ key: "ricotta", label: "Ricotta" },
 	{ key: "milk", label: "Latte" },
+	{ key: "skimMilkPowder", label: "Latte magro in polvere" },
 	{ key: "sucrose", label: "Saccarosio" },
 	{ key: "dextrose", label: "Destrosio" },
 	{ key: "invertedSugar", label: "Zucchero invertito" },

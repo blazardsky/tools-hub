@@ -18,12 +18,16 @@ import {
 	PAC_INDEX,
 	POD_INDEX,
 	type RecipeKind,
+	RICOTTA_PROCEDURE,
+	type RicottaMilk,
 	SERVICE_TEMP,
 	type ServiceTempKey,
 	SUGAR_MODES,
 	type SugarMode,
 	saltGramsPerKg,
 	TARGETS,
+	usesTotalGrams,
+	YOGURT_PROCEDURE,
 } from "./const";
 import { doseFor, generateRecipe, type RecipeResult } from "./lib";
 
@@ -122,20 +126,58 @@ export default function App() {
 	const [eggYolkGrams, setEggYolkGrams] = useState("");
 	const [savory, setSavory] = useState(false);
 	const [saltGrams, setSaltGrams] = useState("");
+	const [greekYogurt, setGreekYogurt] = useState(false);
+	const [yogurtFatPercent, setYogurtFatPercent] = useState(
+		String(INGREDIENT_DATA.yogurt.formula.defaultFatPercent),
+	);
+	const [ricottaMilk, setRicottaMilk] = useState<RicottaMilk>("cow");
+	const [ricottaPercent, setRicottaPercent] = useState(
+		String(INGREDIENT_DATA.ricotta.formula.fractionOfMix * 100),
+	);
+	const [ricottaFatPercent, setRicottaFatPercent] = useState(
+		String(INGREDIENT_DATA.ricotta.formula.cow.fatPercent),
+	);
+	const [ricottaSlngPercent, setRicottaSlngPercent] = useState(
+		String(INGREDIENT_DATA.ricotta.formula.cow.slngPercent),
+	);
+	const [ricottaSolidsPercent, setRicottaSolidsPercent] = useState(
+		String(INGREDIENT_DATA.ricotta.formula.cow.solidsPercent),
+	);
 
 	const isCream = kind === "cream";
+	const isYogurt = kind === "yogurt";
+	const isRicotta = kind === "ricotta";
+	const fixedTotal = usesTotalGrams(kind);
 	const kindMeta = KIND_OPTIONS.find((o) => o.value === kind);
+	const procedure = isYogurt
+		? YOGURT_PROCEDURE
+		: isRicotta
+			? RICOTTA_PROCEDURE
+			: MIX_PROCEDURE;
+
+	const applyRicottaPreset = (milk: RicottaMilk) => {
+		const preset = INGREDIENT_DATA.ricotta.formula[milk];
+		setRicottaMilk(milk);
+		setRicottaFatPercent(String(preset.fatPercent));
+		setRicottaSlngPercent(String(preset.slngPercent));
+		setRicottaSolidsPercent(String(preset.solidsPercent));
+	};
 
 	const result = useMemo(() => {
 		const fruit = parseGrams(fruitGrams);
 		const total = parseGrams(totalGrams);
-		if (isCream ? total <= 0 : fruit <= 0) return null;
+		if (fixedTotal ? total <= 0 : fruit <= 0) return null;
 		const abv = Number(alcoholAbv);
+		const fatPct = Number(yogurtFatPercent);
+		const rPct = Number(ricottaPercent);
+		const rFat = Number(ricottaFatPercent);
+		const rSlng = Number(ricottaSlngPercent);
+		const rSolids = Number(ricottaSolidsPercent);
 		try {
 			return generateRecipe({
 				kind,
-				fruitGrams: isCream ? undefined : fruit,
-				totalGrams: isCream ? total : undefined,
+				fruitGrams: fixedTotal ? undefined : fruit,
+				totalGrams: fixedTotal ? total : undefined,
 				tempKey,
 				sugarMode,
 				alcoholGrams: addAlcohol ? parseGrams(alcoholGrams) : 0,
@@ -146,13 +188,31 @@ export default function App() {
 				eggYolkGrams: addEggYolk ? parseGrams(eggYolkGrams) : 0,
 				savory,
 				saltGrams: savory ? parseGrams(saltGrams) : undefined,
+				yogurtFatPercent:
+					isYogurt && Number.isFinite(fatPct) && fatPct >= 0
+						? fatPct
+						: undefined,
+				greekYogurt: isYogurt ? greekYogurt : undefined,
+				ricottaPercent:
+					isRicotta && Number.isFinite(rPct) && rPct > 0 ? rPct : undefined,
+				ricottaMilk: isRicotta ? ricottaMilk : undefined,
+				ricottaFatPercent:
+					isRicotta && Number.isFinite(rFat) && rFat >= 0 ? rFat : undefined,
+				ricottaSlngPercent:
+					isRicotta && Number.isFinite(rSlng) && rSlng >= 0 ? rSlng : undefined,
+				ricottaSolidsPercent:
+					isRicotta && Number.isFinite(rSolids) && rSolids >= 0
+						? rSolids
+						: undefined,
 			});
 		} catch {
 			return null;
 		}
 	}, [
 		kind,
-		isCream,
+		isYogurt,
+		isRicotta,
+		fixedTotal,
 		fruitGrams,
 		totalGrams,
 		tempKey,
@@ -170,6 +230,13 @@ export default function App() {
 		eggYolkGrams,
 		savory,
 		saltGrams,
+		yogurtFatPercent,
+		greekYogurt,
+		ricottaPercent,
+		ricottaMilk,
+		ricottaFatPercent,
+		ricottaSlngPercent,
+		ricottaSolidsPercent,
 	]);
 
 	const pac = result?.pac ?? null;
@@ -198,6 +265,23 @@ export default function App() {
 		setEggYolkGrams("");
 		setSavory(false);
 		setSaltGrams("");
+		setGreekYogurt(false);
+		setYogurtFatPercent(
+			String(INGREDIENT_DATA.yogurt.formula.defaultFatPercent),
+		);
+		setRicottaMilk("cow");
+		setRicottaPercent(
+			String(INGREDIENT_DATA.ricotta.formula.fractionOfMix * 100),
+		);
+		setRicottaFatPercent(
+			String(INGREDIENT_DATA.ricotta.formula.cow.fatPercent),
+		);
+		setRicottaSlngPercent(
+			String(INGREDIENT_DATA.ricotta.formula.cow.slngPercent),
+		);
+		setRicottaSolidsPercent(
+			String(INGREDIENT_DATA.ricotta.formula.cow.solidsPercent),
+		);
 	};
 
 	return (
@@ -222,10 +306,9 @@ export default function App() {
 									onChange={() => {
 										setKind(opt.value);
 										if (savory) {
-											const mix =
-												opt.value === "cream"
-													? parseGrams(totalGrams) || 1000
-													: parseGrams(fruitGrams) * FRUIT_TO_TOTAL || 1000;
+											const mix = usesTotalGrams(opt.value)
+												? parseGrams(totalGrams) || 1000
+												: parseGrams(fruitGrams) * FRUIT_TO_TOTAL || 1000;
 											setSaltGrams(
 												String(
 													Math.round(
@@ -252,7 +335,11 @@ export default function App() {
 						<p className="text-sm text-muted-foreground">
 							{isCream
 								? `Zuccheri ${TARGETS.sugarsCream.min}–${TARGETS.sugarsCream.max}% · grassi ${TARGETS.fatsCream.min}–${TARGETS.fatsCream.max}%`
-								: `Frutta tipicamente ${TARGETS.fruitPercent.min}–${TARGETS.fruitPercent.max}% della miscela (×${FRUIT_TO_TOTAL} dal peso frutta)`}
+								: isYogurt
+									? `Yogurt 50% · zuccheri ${TARGETS.sugarsCream.min}–${TARGETS.sugarsCream.max}% · grassi ${TARGETS.fatsYogurt.min}–${TARGETS.fatsYogurt.max}% · neutro 8 g/kg`
+									: isRicotta
+										? `Ricotta ${TARGETS.ricottaPercent.min}–${TARGETS.ricottaPercent.max}% · zuccheri ${TARGETS.sugarsCream.min}–${TARGETS.sugarsCream.max}% · grassi ~${INGREDIENT_DATA.ricotta.formula.targetMixFatPercent}% · neutro 8 g/kg`
+										: `Frutta tipicamente ${TARGETS.fruitPercent.min}–${TARGETS.fruitPercent.max}% della miscela (×${FRUIT_TO_TOTAL} dal peso frutta)`}
 							{kind === "sorbet"
 								? ` · zuccheri ${TARGETS.sugarsSorbet.min}–${TARGETS.sugarsSorbet.max}%`
 								: null}
@@ -301,7 +388,7 @@ export default function App() {
 								checked={savory}
 								onChange={() => {
 									setSavory(true);
-									const mix = isCream
+									const mix = fixedTotal
 										? parseGrams(totalGrams) || 1000
 										: parseGrams(fruitGrams) * FRUIT_TO_TOTAL || 1000;
 									setSaltGrams(
@@ -347,14 +434,201 @@ export default function App() {
 					)}
 				</fieldset>
 
-				{isCream ? (
-					<NumberField
-						id="totalGrams"
-						label="Peso desiderato della miscela"
-						value={totalGrams}
-						onChange={setTotalGrams}
-						hint="Di solito 1000 g per dosare facilmente"
-					/>
+				{fixedTotal ? (
+					<>
+						<NumberField
+							id="totalGrams"
+							label="Peso desiderato della miscela"
+							value={totalGrams}
+							onChange={setTotalGrams}
+							hint="Di solito 1000 g per dosare facilmente"
+						/>
+						{isYogurt ? (
+							<>
+								<fieldset className="space-y-3">
+									<legend className={labelClass}>Tipo di yogurt</legend>
+									<div className="grid gap-2 sm:grid-cols-2">
+										<label
+											className={cn(
+												"flex cursor-pointer gap-2 border border-border px-3 py-2",
+												!greekYogurt && "border-primary bg-muted",
+											)}
+										>
+											<input
+												type="radio"
+												name="greekYogurt"
+												checked={!greekYogurt}
+												onChange={() => {
+													setGreekYogurt(false);
+													setYogurtFatPercent(
+														String(
+															INGREDIENT_DATA.yogurt.formula.defaultFatPercent,
+														),
+													);
+												}}
+												className="mt-1"
+											/>
+											<span>
+												<span className="block text-sm font-medium text-foreground">
+													Yogurt normale
+												</span>
+												<span className="block text-sm text-muted-foreground">
+													~85–88% acqua · default{" "}
+													{INGREDIENT_DATA.yogurt.formula.defaultFatPercent}% MG
+												</span>
+											</span>
+										</label>
+										<label
+											className={cn(
+												"flex cursor-pointer gap-2 border border-border px-3 py-2",
+												greekYogurt && "border-primary bg-muted",
+											)}
+										>
+											<input
+												type="radio"
+												name="greekYogurt"
+												checked={greekYogurt}
+												onChange={() => {
+													setGreekYogurt(true);
+													setYogurtFatPercent(
+														String(
+															INGREDIENT_DATA.yogurt.formula
+																.greekDefaultFatPercent,
+														),
+													);
+												}}
+												className="mt-1"
+											/>
+											<span>
+												<span className="block text-sm font-medium text-foreground">
+													Yogurt greco
+												</span>
+												<span className="block text-sm text-muted-foreground">
+													Colato · più solidi/proteine · default{" "}
+													{
+														INGREDIENT_DATA.yogurt.formula
+															.greekDefaultFatPercent
+													}
+													% MG
+												</span>
+											</span>
+										</label>
+									</div>
+								</fieldset>
+								<NumberField
+									id="yogurtFatPercent"
+									label="Grassi dello yogurt"
+									value={yogurtFatPercent}
+									onChange={setYogurtFatPercent}
+									min={0}
+									step={0.1}
+									suffix="%"
+									hint={`Panna bilanciata per ~${INGREDIENT_DATA.yogurt.formula.targetMixFatPercent}% grassi totali (range ${TARGETS.fatsYogurt.min}–${TARGETS.fatsYogurt.max}%)`}
+								/>
+							</>
+						) : null}
+						{isRicotta ? (
+							<>
+								<fieldset className="space-y-3">
+									<legend className={labelClass}>Tipo di ricotta</legend>
+									<div className="grid gap-2 sm:grid-cols-2">
+										<label
+											className={cn(
+												"flex cursor-pointer gap-2 border border-border px-3 py-2",
+												ricottaMilk === "cow" && "border-primary bg-muted",
+											)}
+										>
+											<input
+												type="radio"
+												name="ricottaMilk"
+												checked={ricottaMilk === "cow"}
+												onChange={() => applyRicottaPreset("cow")}
+												className="mt-1"
+											/>
+											<span>
+												<span className="block text-sm font-medium text-foreground">
+													Vaccina
+												</span>
+												<span className="block text-sm text-muted-foreground">
+													Tipica 10–13% MG · preset{" "}
+													{INGREDIENT_DATA.ricotta.formula.cow.fatPercent}% /{" "}
+													{INGREDIENT_DATA.ricotta.formula.cow.slngPercent}%
+													SLNG
+												</span>
+											</span>
+										</label>
+										<label
+											className={cn(
+												"flex cursor-pointer gap-2 border border-border px-3 py-2",
+												ricottaMilk === "sheep" && "border-primary bg-muted",
+											)}
+										>
+											<input
+												type="radio"
+												name="ricottaMilk"
+												checked={ricottaMilk === "sheep"}
+												onChange={() => applyRicottaPreset("sheep")}
+												className="mt-1"
+											/>
+											<span>
+												<span className="block text-sm font-medium text-foreground">
+													Pecora
+												</span>
+												<span className="block text-sm text-muted-foreground">
+													Tipica 15–20% MG · preset{" "}
+													{INGREDIENT_DATA.ricotta.formula.sheep.fatPercent}% /{" "}
+													{INGREDIENT_DATA.ricotta.formula.sheep.slngPercent}%
+													SLNG
+												</span>
+											</span>
+										</label>
+									</div>
+								</fieldset>
+								<NumberField
+									id="ricottaPercent"
+									label="Ricotta nella miscela"
+									value={ricottaPercent}
+									onChange={setRicottaPercent}
+									min={TARGETS.ricottaPercent.min}
+									step={1}
+									suffix="%"
+									hint={`Range ${TARGETS.ricottaPercent.min}–${TARGETS.ricottaPercent.max}% (150–250 g/kg) per sapore definito`}
+								/>
+								<div className="grid gap-3 sm:grid-cols-3">
+									<NumberField
+										id="ricottaFatPercent"
+										label="Grassi (MG)"
+										value={ricottaFatPercent}
+										onChange={setRicottaFatPercent}
+										min={0}
+										step={0.1}
+										suffix="%"
+										hint={`Panna → grassi mix ~${INGREDIENT_DATA.ricotta.formula.targetMixFatPercent}%`}
+									/>
+									<NumberField
+										id="ricottaSlngPercent"
+										label="SLNG"
+										value={ricottaSlngPercent}
+										onChange={setRicottaSlngPercent}
+										min={0}
+										step={0.1}
+										suffix="%"
+										hint="Solidi lattei non grassi — dosa il LMP"
+									/>
+									<NumberField
+										id="ricottaSolidsPercent"
+										label="Solidi totali"
+										value={ricottaSolidsPercent}
+										onChange={setRicottaSolidsPercent}
+										min={0}
+										step={0.1}
+										suffix="%"
+										hint="Ideale ≈ MG + SLNG"
+									/>
+								</div>
+							</>
+						) : null}
+					</>
 				) : (
 					<NumberField
 						id="fruitGrams"
@@ -771,8 +1045,8 @@ export default function App() {
 				<h2 className="text-xl font-semibold text-foreground">Ricetta</h2>
 				{!result ? (
 					<p className="text-muted-foreground">
-						Inserisci un peso di {isCream ? "miscela" : "frutta"} per generare
-						le quantità.
+						Inserisci un peso di {fixedTotal ? "miscela" : "frutta"} per
+						generare le quantità.
 					</p>
 				) : (
 					<>
@@ -791,7 +1065,13 @@ export default function App() {
 									({ key }) => result.ingredients[key] > 0,
 								).map(({ key, label }) => (
 									<tr key={key} className="border-b border-border">
-										<td className="py-2 pr-4">{label}</td>
+										<td className="py-2 pr-4">
+											{key === "yogurt"
+												? `${greekYogurt ? "Yogurt greco" : "Yogurt"} (${yogurtFatPercent}% MG)`
+												: key === "ricotta"
+													? `Ricotta ${ricottaMilk === "sheep" ? "pecora" : "vaccina"} (${ricottaFatPercent}% MG)`
+													: label}
+										</td>
 										<td className="py-2 tabular-nums">
 											{result.ingredients[key]}
 										</td>
@@ -844,7 +1124,9 @@ export default function App() {
 								<p className="text-muted-foreground">
 									{CASEIN_ADVICE.alcoholTip}
 								</p>
-								{kind === "fruit_acid" || result.ingredients.lemonJuice > 0 ? (
+								{kind === "fruit_acid" ||
+								kind === "yogurt" ||
+								result.ingredients.lemonJuice > 0 ? (
 									<p className="text-primary">{CASEIN_ADVICE.acidWarning}</p>
 								) : null}
 							</div>
@@ -918,9 +1200,9 @@ export default function App() {
 
 						<div className="space-y-3 border border-border p-3">
 							<h3 className="text-base font-medium text-foreground">
-								{MIX_PROCEDURE.title}
+								{procedure.title}
 							</h3>
-							{MIX_PROCEDURE.stages.map((stage) => (
+							{procedure.stages.map((stage) => (
 								<div key={stage.title} className="space-y-1">
 									<p className="text-sm font-medium text-foreground">
 										{stage.title}
