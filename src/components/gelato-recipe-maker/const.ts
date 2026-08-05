@@ -2,7 +2,7 @@
 
 export const FRUIT_TO_TOTAL = 2.2;
 
-/** Target ranges (informational). */
+/** Target ranges (informational + sugar/PAC optimizer). */
 export const TARGETS = {
 	fruitPercent: { min: 35, max: 50 },
 	sugarsCream: { min: 18, max: 22 },
@@ -14,9 +14,13 @@ export const TARGETS = {
 	ricottaPercent: { min: 15, max: 25 },
 } as const;
 
+/** |PAC − target| within this → “in target”. */
+export const PAC_TOLERANCE = 10;
+
 /**
  * Alert thresholds for mix shares (% of final mix).
  * Water = total water from all ingredients (not only added water).
+ * Fats: protocol §6 patina risk >10–12%.
  * ponytail: placeholder cutoffs — tune after tasting tests.
  */
 export const ADDITIVE_ALERTS = {
@@ -24,12 +28,41 @@ export const ADDITIVE_ALERTS = {
 	alcohol: { warn: 2, high: 5 },
 	/** Total water content; typical gelato ~55–65%. */
 	water: { warn: 68, high: 75 },
+	/** Total dairy fat % of mix. */
+	fats: { warn: 10, high: 12 },
+} as const;
+
+/**
+ * Approx lactose fraction (protocol: milk 4%; LMP ~50%).
+ * Used for water:lactose ≥ 6:1 sandiness check.
+ */
+export const LACTOSE_FRACTION = {
+	milk: 0.04,
+	yogurt: 0.04,
+	/** Cream ~35% MG. */
+	panna: 0.03,
+	skimMilkPowder: 0.5,
+	/** Rough; lactose is a slice of ricotta SLNG. */
+	ricotta: 0.03,
+} as const;
+
+/** Minimum free water : lactose (below → sabbiosità tip). */
+export const MIN_WATER_TO_LACTOSE = 6;
+
+/**
+ * Fat fraction of fixed dairy lines (yogurt/ricotta MG from recipe inputs).
+ */
+export const FAT_FRACTION = {
+	milk: 0.036,
+	panna: 0.35,
+	eggYolk: 0.32,
 } as const;
 
 /**
  * Water fraction of recipe lines (mix water %).
  * Alcohol: use (100 − ABV) / 100; default ABV 40% → 0.6.
  * Ricotta: 1 − solids%/100 (from recipe inputs).
+ * Dextrose monohydrate ~9% water (PAC/POD still on sugar solids).
  */
 export const WATER_FRACTION = {
 	milk: 0.875,
@@ -41,6 +74,8 @@ export const WATER_FRACTION = {
 	honey: 0.19,
 	/** Finished invert syrup ~75% solids. */
 	invertedSugar: 0.25,
+	/** Monohydrate ~9% crystallization water. */
+	dextrose: 0.09,
 	eggYolk: 0.48,
 	fruit: 0.85,
 	skimMilkPowder: 0.04,
@@ -160,12 +195,12 @@ export const INGREDIENT_DATA = {
 		pac: 100,
 		solidsPercent: 100,
 		notes:
-			"Zucchero del latte poco solubile; assorbe ~10× il suo peso in acqua; rischio sabbiosità se in eccesso. Indice di lavoro POD 16 / PAC 100 (non dosato in formula).",
+			"Zucchero del latte poco solubile; solubilità pratica ~1:6 acqua:lattosio (sotto → sabbiosità). Indice di lavoro POD 40 / PAC 100 (non dosato in formula).",
 		dosage:
 			"Apportato dai derivati del latte (SLNG); limitare per evitare difetti. Non dosato in ricetta; con latte senza lattosio tip UI −10% zuccheri se il mix risulta morbido/dolce.",
 		formula: {
 			pac: 100,
-			pod: 16,
+			pod: 40,
 		},
 	},
 	glucoseAtomized42DE: {
@@ -712,6 +747,9 @@ export const INVERT_SUGAR_DIY = {
 	/** Neutralize residual acid so dairy doesn't curdle. */
 	bicarbonatePer100gSucrose: 0.5,
 	heatC: [80, 85] as const,
+	/** Hold at ~80°C / pH ~3 for >90% inversion. */
+	inversionMinutes: 30,
+	targetPh: 3,
 } as const;
 
 /** DIY invert-sugar procedure (shown when sucrose-only or invert mode). */
@@ -719,8 +757,8 @@ export const INVERT_SUGAR_HOWTO = {
 	summary:
 		"Lo zucchero invertito spezza il saccarosio in glucosio + fruttosio: PAC 190 (vs 100) e blocca la cristallizzazione. Lo sciroppo finito è ~75% solidi / 25% acqua — l'acqua legata sposta latte/acqua in formula.",
 	steps: [
-		`Per 100 g di saccarosio: ${INVERT_SUGAR_DIY.waterPer100gSucrose} g acqua + ${INVERT_SUGAR_DIY.citricAcidPer100gSucrose} g acido citrico (o ~${INVERT_SUGAR_DIY.lemonJuicePer100gSucrose} g succo di limone filtrato).`,
-		`Scalda a ${INVERT_SUGAR_DIY.heatC[0]}–${INVERT_SUGAR_DIY.heatC[1]}°C finché i solidi sono ~${INVERT_SUGAR_DIY.solidsPercent}% (parte dell'acqua evapora).`,
+		`Per 100 g di saccarosio: ${INVERT_SUGAR_DIY.waterPer100gSucrose} g acqua + ${INVERT_SUGAR_DIY.citricAcidPer100gSucrose} g acido citrico (o ~${INVERT_SUGAR_DIY.lemonJuicePer100gSucrose} g succo di limone filtrato) — pH ~${INVERT_SUGAR_DIY.targetPh}.`,
+		`Scalda a ${INVERT_SUGAR_DIY.heatC[0]}–${INVERT_SUGAR_DIY.heatC[1]}°C e tieni ~${INVERT_SUGAR_DIY.inversionMinutes} min (inversione >90%); i solidi finiscono ~${INVERT_SUGAR_DIY.solidsPercent}% (parte dell'acqua evapora).`,
 		`A fine inversione: ${INVERT_SUGAR_DIY.bicarbonatePer100gSucrose} g bicarbonato di sodio ogni 100 g di saccarosio iniziali per neutralizzare l'acidità residua.`,
 	],
 } as const;
@@ -762,6 +800,7 @@ export const MIX_PROCEDURE = {
 			title: "5. Mantecazione e timing della frutta",
 			points: [
 				"Carica il mantecatore a ≤ 4°C così conservi l'aria costruita in maturazione.",
+				"Overrun tipico: creme latte/panna ~35–40%; frutta/sorbetti ~25–30%. Sotto −4°C l'aria non si incorpora più — non prolungare l'agitazione oltre.",
 				"Frutta acida (pH < 5): aggiungi alla fine, preferibilmente in mantecatura quando la base è sotto ~2°C — il freddo ferma la precipitazione della caseina («taglio»).",
 				"Frutta che imbrunisce (banana, pesca): incorpora per ultima e manteca subito per mantenere il colore.",
 			],
@@ -804,7 +843,10 @@ export const YOGURT_PROCEDURE = {
 		},
 		{
 			title: "5. Maturazione e mantecatura",
-			points: ["Matura 6–12 h a 4°C, poi manteca a ≤ 4°C."],
+			points: [
+				"Matura 6–12 h a 4°C, poi manteca a ≤ 4°C.",
+				"Overrun creme ~35–40%; sotto −4°C l'aria cessa — non protrarre l'agitazione.",
+			],
 		},
 	],
 } as const;
@@ -838,7 +880,8 @@ export const RICOTTA_PROCEDURE = {
 		{
 			title: "4. Mantecazione e inclusioni",
 			points: [
-				"Manteca a ≤ 4°C. Overrun tipico ~35% grazie alle proteine della ricotta.",
+				"Manteca a ≤ 4°C. Overrun tipico ~35% grazie alle proteine della ricotta (creme ~35–40%).",
+				"Sotto −4°C l'aria non si incorpora più — non prolungare l'agitazione.",
 				"Fichi, gocce di cioccolato o simili (~100 g/kg): a fine mantecatura. Canditi/caramellati apportano zuccheri extra (gelato più morbido).",
 			],
 		},

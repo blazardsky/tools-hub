@@ -4,13 +4,17 @@ import {
 	ADDITIVE_ALERTS,
 	ALCOHOL_MIX_TWEAKS,
 	ALCOHOL_PAC_PER_PURE_GRAM,
+	FAT_FRACTION,
 	FRUIT_TO_TOTAL,
 	INGREDIENT_DATA,
 	INGREDIENT_ROWS,
 	INVERT_SUGAR_DIY,
 	KIND,
 	KIND_OPTIONS,
+	LACTOSE_FRACTION,
+	MIN_WATER_TO_LACTOSE,
 	PAC_INDEX,
+	PAC_TOLERANCE,
 	POD_INDEX,
 	type RecipeKind,
 	type RicottaMilk,
@@ -223,7 +227,7 @@ export type RecipeIngredients = {
 };
 
 export type AdditiveAlert = {
-	ingredient: "panna" | "alcohol" | "water" | "sugars";
+	ingredient: "panna" | "alcohol" | "water" | "sugars" | "fats";
 	/** Share of final mix weight. */
 	percent: number;
 	severity: "ok" | "warn" | "high";
@@ -273,7 +277,13 @@ export type RecipeResult = {
 	actualTotal: number;
 	ingredients: RecipeIngredients;
 	/** Percents of final mix for watch metrics. */
-	percents: { panna: number; alcohol: number; water: number; sugars: number };
+	percents: {
+		panna: number;
+		alcohol: number;
+		water: number;
+		sugars: number;
+		fats: number;
+	};
 	alerts: AdditiveAlert[];
 	/** Process / balancing tips (lemon cold-add, stabilizer bump, …). */
 	tips: string[];
@@ -315,12 +325,13 @@ function severity(
 	return "ok";
 }
 
-/** Sugar % vs cream/sorbet target range. */
+/** Sugar % vs cream/sorbet target range (§6: creams excess ~>22–24% colatura). */
 function sugarSeverity(
 	percent: number,
 	range: { min: number; max: number },
 ): AdditiveAlert["severity"] {
-	if (percent < range.min - 2 || percent > range.max + 3) return "high";
+	// high: max+2 → creams warn >22, high >24
+	if (percent < range.min - 2 || percent > range.max + 2) return "high";
 	if (percent < range.min || percent > range.max) return "warn";
 	return "ok";
 }
@@ -348,11 +359,37 @@ function mixWaterGrams(
 		ing.panna * WATER_FRACTION.panna +
 		ing.honey * WATER_FRACTION.honey +
 		ing.invertedSugar * WATER_FRACTION.invertedSugar +
+		ing.dextrose * WATER_FRACTION.dextrose +
 		ing.eggYolk * WATER_FRACTION.eggYolk +
 		ing.fruit * WATER_FRACTION.fruit +
 		ing.skimMilkPowder * WATER_FRACTION.skimMilkPowder +
 		ricottaWater +
 		ing.alcohol * Math.max(0, 1 - abv / 100)
+	);
+}
+
+/** Estimated lactose g from dairy lines (protocol milk 4% / LMP ~50%). */
+function mixLactoseGrams(ing: RecipeIngredients): number {
+	return (
+		ing.milk * LACTOSE_FRACTION.milk +
+		ing.yogurt * LACTOSE_FRACTION.yogurt +
+		ing.panna * LACTOSE_FRACTION.panna +
+		ing.skimMilkPowder * LACTOSE_FRACTION.skimMilkPowder +
+		ing.ricotta * LACTOSE_FRACTION.ricotta
+	);
+}
+
+/** Estimated fat g from dairy + yolk (yogurt/ricotta MG from inputs). */
+function mixFatGrams(
+	ing: RecipeIngredients,
+	opts: { yogurtFatPercent: number; ricottaFatPercent: number },
+): number {
+	return (
+		ing.milk * FAT_FRACTION.milk +
+		ing.panna * FAT_FRACTION.panna +
+		ing.eggYolk * FAT_FRACTION.eggYolk +
+		ing.yogurt * (opts.yogurtFatPercent / 100) +
+		ing.ricotta * (opts.ricottaFatPercent / 100)
 	);
 }
 
@@ -428,20 +465,73 @@ function lmpForMixSlng(opts: {
 }
 
 /**
- * Grams of sugars needed for `desiredPac` at this mix weight & sucrose share.
- * High-PAC fraction (dextrose / honey / invert) uses index 190.
- * PAC = (sucrose×1 + highPac×1.9) × 1000/mix
+ * Hit desired sugar PAC while keeping total sugars in [min, max], prefer preferred mass.
+ * Retunes sucrose / high-PAC share first; only then moves mass within the range.
  */
-function sugarsForPac(
-	desiredPac: number,
-	mixGrams: number,
-	sucroseShare: number,
-): { sucrose: number; highPac: number } {
-	if (desiredPac <= 0 || mixGrams <= 0) return { sucrose: 0, highPac: 0 };
-	const pacPerGramAt1kg = 1.9 - 0.9 * sucroseShare;
-	const sugarTotal = (desiredPac * mixGrams) / (1000 * pacPerGramAt1kg);
-	const sucrose = sugarTotal * sucroseShare;
-	return { sucrose, highPac: sugarTotal - sucrose };
+function sugarsBalanced(opts: {
+	desiredPac: number;
+	mixGrams: number;
+	preferredSugar: number;
+	minSugar: number;
+	maxSugar: number;
+	highPacIndex: number;
+	/** Lock sucrose share (1 = solo saccarosio). */
+	fixedShare?: number;
+}): { sucrose: number; highPac: number } {
+	const mix = opts.mixGrams;
+	const desired = opts.desiredPac;
+	const idx = opts.highPacIndex / 100;
+	const minS = Math.max(0, opts.minSugar);
+	const maxS = Math.max(minS, opts.maxSugar);
+	const pref = Math.min(maxS, Math.max(minS, opts.preferredSugar));
+
+	if (desired <= 0 || mix <= 0) return { sucrose: 0, highPac: 0 };
+
+	if (opts.fixedShare != null) {
+		const share = Math.min(1, Math.max(0, opts.fixedShare));
+		const pacPerGram = (share + (1 - share) * idx) * (1000 / mix);
+		const total = Math.min(
+			maxS,
+			Math.max(minS, pacPerGram > 0 ? desired / pacPerGram : pref),
+		);
+		return { sucrose: total * share, highPac: total * (1 - share) };
+	}
+
+	const solveAt = (T: number): { sucrose: number; highPac: number } | null => {
+		if (T <= 0) return { sucrose: 0, highPac: 0 };
+		if (Math.abs(1 - idx) < 1e-9) return { sucrose: T, highPac: 0 };
+		const s = (desired * mix) / 1000 - T * idx;
+		const sucrose = s / (1 - idx);
+		if (sucrose >= -1e-6 && sucrose <= T + 1e-6) {
+			const sc = Math.min(T, Math.max(0, sucrose));
+			return { sucrose: sc, highPac: T - sc };
+		}
+		return null;
+	};
+
+	const atPref = solveAt(pref);
+	if (atPref) return atPref;
+
+	const pacAt = (sucrose: number, highPac: number) =>
+		pacPoints(sucrose, PAC_INDEX.sucrose, mix) +
+		pacPoints(highPac, opts.highPacIndex, mix);
+
+	// Need more PAC than all high-PAC at preferred → raise mass (cap max).
+	if (pacAt(0, pref) < desired) {
+		const T = Math.min(maxS, Math.max(pref, (desired * mix) / (1000 * idx)));
+		return solveAt(T) ?? { sucrose: 0, highPac: T };
+	}
+	// Need less PAC than all sucrose at preferred → lower mass (floor min).
+	if (pacAt(pref, 0) > desired) {
+		const T = Math.max(minS, Math.min(pref, (desired * mix) / 1000));
+		return solveAt(T) ?? { sucrose: T, highPac: 0 };
+	}
+	// Straddle: clamp share at preferred.
+	const s = Math.min(
+		pref,
+		Math.max(0, ((desired * mix) / 1000 - pref * idx) / (1 - idx)),
+	);
+	return { sucrose: s, highPac: pref - s };
 }
 
 function buildSucroseAdvisory(
@@ -483,8 +573,9 @@ function buildSucroseAdvisory(
 
 /**
  * Build a balanced gelato/sorbet recipe from fruit (or total) weight.
- * Sugars are scaled so sugar PAC (+ alcohol) hits the service-temperature target
- * — except sucrose-only mode, which stays at edible sweetness and reports the PAC gap.
+ * Sugars stay in the kind’s % range (~18–22% creams) while chasing the
+ * service-temperature PAC (within ±PAC_TOLERANCE) by retuning sucrose / high-PAC share.
+ * Sucrose-only mode keeps edible sweetness and reports the PAC gap.
  * Liquid (milk or water) is Q.b. to hit targetTotal before extras.
  */
 export function generateRecipe(input: RecipeInput): RecipeResult {
@@ -495,7 +586,6 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 	const pacTarget = SERVICE_TEMP[tempKey].pacTarget;
 	const { fruit, targetTotal } = resolveTargetTotal(input);
 
-	const sucroseShare = mode.sucroseOnly ? 1 : params.sucroseShare;
 	const sugarTotalFactor =
 		sugarMode === "common"
 			? params.liquid === "water"
@@ -517,14 +607,24 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 	const desiredSugarPac = Math.max(0, pacTarget - alcoholPac - saltPac);
 	// With alcohol: avoid high-PAC sugars (dextrose/invert/honey) — prefer sucrose.
 	const preferSucrose = alcohol > 0 && ALCOHOL_MIX_TWEAKS.preferSucrose;
-	const share = mode.sucroseOnly || preferSucrose ? 1 : sucroseShare;
 
-	const baselineSugar = Math.max(
+	const sugarRange =
+		params.liquid === "water" ? TARGETS.sugarsSorbet : TARGETS.sugarsCream;
+	const fruitSugarCut = fruit * params.fruitSugarFactor;
+	const preferredSugar = Math.max(
 		0,
-		targetTotal * sugarTotalFactor - fruit * params.fruitSugarFactor,
+		targetTotal * sugarTotalFactor - fruitSugarCut,
 	);
-	const baselineSucrose = baselineSugar * share;
-	const baselineHighPac = baselineSugar - baselineSucrose;
+	// With alcohol, sugars may drop below the usual floor to reserve PAC.
+	const minSugar =
+		alcohol > 0
+			? 0
+			: Math.max(0, (targetTotal * sugarRange.min) / 100 - fruitSugarCut);
+	const maxSugar = Math.max(
+		0,
+		(targetTotal * sugarRange.max) / 100 - fruitSugarCut,
+	);
+
 	const highPacIndex = preferSucrose
 		? PAC_INDEX.sucrose
 		: mode.useHoney
@@ -532,26 +632,26 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 			: mode.useInvert
 				? PAC_INDEX.invertedSugar
 				: PAC_INDEX.dextrose;
-	const baselinePac =
-		pacPoints(baselineSucrose, PAC_INDEX.sucrose, targetTotal) +
-		pacPoints(baselineHighPac, highPacIndex, targetTotal);
 
 	// Sucrose-only: keep edible sugar %, do not scale up to freezer PAC (would be ~41% @ −18°C).
 	// Still cut if alcohol PAC would push the mix over the target.
 	const scaled = mode.sucroseOnly
 		? {
 				sucrose: Math.min(
-					baselineSucrose,
+					preferredSugar,
 					(desiredSugarPac * targetTotal) / 1000,
 				),
 				highPac: 0,
 			}
-		: baselinePac > 0
-			? {
-					sucrose: baselineSucrose * (desiredSugarPac / baselinePac),
-					highPac: baselineHighPac * (desiredSugarPac / baselinePac),
-				}
-			: sugarsForPac(desiredSugarPac, targetTotal, share);
+		: sugarsBalanced({
+				desiredPac: desiredSugarPac,
+				mixGrams: targetTotal,
+				preferredSugar,
+				minSugar,
+				maxSugar,
+				highPacIndex,
+				fixedShare: preferSucrose ? 1 : undefined,
+			});
 
 	const sucrose = scaled.sucrose;
 	const dextrose =
@@ -752,22 +852,26 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		ingredients.dextrose +
 		ingredients.honey +
 		(invertDiy?.solidsGrams ?? 0);
+	/** Added sugars + estimated fruit sugars (same cut used in the formula). */
+	const sugarsForPercent = sugarGrams + fruitSugarCut;
+
+	const waterGrams = mixWaterGrams(ingredients, {
+		abvPercent: abv,
+		ricottaSolidsPercent,
+	});
+	const lactoseGrams = mixLactoseGrams(ingredients);
+	const fatGrams = mixFatGrams(ingredients, {
+		yogurtFatPercent,
+		ricottaFatPercent,
+	});
 
 	const percents = {
 		panna: pct(ingredients.panna, actualTotal),
 		alcohol: pct(ingredients.alcohol, actualTotal),
-		water: pct(
-			mixWaterGrams(ingredients, {
-				abvPercent: abv,
-				ricottaSolidsPercent,
-			}),
-			actualTotal,
-		),
-		sugars: pct(sugarGrams, actualTotal),
+		water: pct(waterGrams, actualTotal),
+		sugars: pct(sugarsForPercent, actualTotal),
+		fats: pct(fatGrams, actualTotal),
 	};
-
-	const sugarRange =
-		params.liquid === "water" ? TARGETS.sugarsSorbet : TARGETS.sugarsCream;
 
 	const alerts: AdditiveAlert[] = [
 		{
@@ -789,6 +893,11 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 			ingredient: "sugars",
 			percent: percents.sugars,
 			severity: sugarSeverity(percents.sugars, sugarRange),
+		},
+		{
+			ingredient: "fats",
+			percent: percents.fats,
+			severity: severity(percents.fats, ADDITIVE_ALERTS.fats),
 		},
 	];
 
@@ -846,7 +955,7 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 	}
 	if (invertDiy) {
 		const diyAcid = `${invertDiy.lemonJuice} g limone (o ${invertDiy.citricAcid} g acido citrico)`;
-		const diyCore = `Zucchero invertito: ${invertDiy.syrupGrams} g sciroppo (~${INVERT_SUGAR_DIY.solidsPercent}% solidi = ${invertDiy.solidsGrams} g; acqua legata ${invertDiy.waterInSyrup} g già sottratta da latte/acqua). Fai da te: ${invertDiy.sucrose} g saccarosio + ${invertDiy.processWater} g acqua + ${diyAcid} a ${INVERT_SUGAR_DIY.heatC[0]}–${INVERT_SUGAR_DIY.heatC[1]}°C`;
+		const diyCore = `Zucchero invertito: ${invertDiy.syrupGrams} g sciroppo (~${INVERT_SUGAR_DIY.solidsPercent}% solidi = ${invertDiy.solidsGrams} g; acqua legata ${invertDiy.waterInSyrup} g già sottratta da latte/acqua). Fai da te: ${invertDiy.sucrose} g saccarosio + ${invertDiy.processWater} g acqua + ${diyAcid} a ${INVERT_SUGAR_DIY.heatC[0]}–${INVERT_SUGAR_DIY.heatC[1]}°C ~${INVERT_SUGAR_DIY.inversionMinutes} min (pH ~${INVERT_SUGAR_DIY.targetPh})`;
 		if (invertNeutralize) {
 			tips.push(
 				`${diyCore}; a fine ${invertDiy.bicarbonate} g bicarbonato per neutralizzare.`,
@@ -882,6 +991,49 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		);
 	}
 
+	// §6 diagnostics — corrective tips when thresholds fire
+	const waterAlert = alerts.find((a) => a.ingredient === "water");
+	if (waterAlert && waterAlert.severity !== "ok") {
+		tips.push(
+			`Acqua totale ${percents.water}% — rischio cristalli/ghiaccio; alza solidi (LMP/zuccheri nel range) o riduci liquidi liberi.`,
+		);
+	}
+	const sugarsAlert = alerts.find((a) => a.ingredient === "sugars");
+	if (sugarsAlert && sugarsAlert.severity !== "ok") {
+		tips.push(
+			percents.sugars > sugarRange.max
+				? `Zuccheri ${percents.sugars}% sopra ${sugarRange.max}% — rischio colatura; riduci zuccheri o alza solidi non zuccherini.`
+				: `Zuccheri ${percents.sugars}% sotto ${sugarRange.min}% — scoop più duro; alza zuccheri nel range.`,
+		);
+	}
+	const fatsAlert = alerts.find((a) => a.ingredient === "fats");
+	if (fatsAlert && fatsAlert.severity !== "ok") {
+		tips.push(
+			`Grassi ${percents.fats}% — rischio patina oleosa; riduci panna (target creme ${TARGETS.fatsCream.min}–${TARGETS.fatsCream.max}%).`,
+		);
+	}
+	if (lactoseGrams > 0) {
+		const ratio = waterGrams / lactoseGrams;
+		if (ratio < MIN_WATER_TO_LACTOSE) {
+			tips.push(
+				`Lattosio: acqua:lattosio ≈ ${round(ratio, 1)}:1 (sotto ${MIN_WATER_TO_LACTOSE}:1) — rischio sabbiosità; riduci LMP o alza acqua libera.`,
+			);
+		}
+	}
+	// Soft crystallization tip when interferent sugars < 5% (blend/invert/honey)
+	const interferent =
+		ingredients.dextrose + ingredients.honey + (invertDiy?.solidsGrams ?? 0);
+	if (
+		!mode.sucroseOnly &&
+		!preferSucrose &&
+		sugarGrams > 0 &&
+		interferent / sugarGrams < 0.05
+	) {
+		tips.push(
+			"Cristallizzazione: sostituisci ~5–10% del saccarosio con destrosio/invertito (zuccheri interferenti).",
+		);
+	}
+
 	const pac = computePacBalance({
 		tempKey,
 		mixGrams: actualTotal,
@@ -912,6 +1064,15 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 				abv || 40,
 			)
 		: null;
+
+	const pacDelta = round(pac.total - pac.target, 1);
+	if (Math.abs(pacDelta) > PAC_TOLERANCE) {
+		tips.push(
+			pacDelta > 0
+				? `PAC ${pac.total} sopra target ${pac.target} di ${pacDelta} (tolleranza ±${PAC_TOLERANCE}) — scoop più morbido; riduci destrosio/invertito o alcol.`
+				: `PAC ${pac.total} sotto target ${pac.target} di ${Math.abs(pacDelta)} (tolleranza ±${PAC_TOLERANCE}) — più sodo; alza destrosio/invertito, zuccheri nel range, o alcol.`,
+		);
+	}
 
 	return {
 		kind: input.kind,
@@ -1093,6 +1254,28 @@ export function __selfCheck() {
 				Object.fromEntries(result.alerts.map((a) => [a.ingredient, a])),
 		"sugars alert present",
 	);
+	assert(
+		Math.abs(result.percents.sugars - 18) < 0.5,
+		`cream blend sugars ~18% got ${result.percents.sugars}`,
+	);
+	assert(
+		Math.abs(result.pac.total - result.pac.target) <= PAC_TOLERANCE,
+		`cream blend PAC within ±${PAC_TOLERANCE}: ${result.pac.total} vs ${result.pac.target}`,
+	);
+	const creamHome = generateRecipe({
+		kind: "cream",
+		totalGrams: 1000,
+		tempKey: "home",
+		sugarMode: "blend",
+	});
+	assert(
+		creamHome.percents.sugars >= 18 && creamHome.percents.sugars <= 22.1,
+		`cream home sugars in 18–22% got ${creamHome.percents.sugars}`,
+	);
+	assert(
+		Math.abs(creamHome.pac.total - creamHome.pac.target) <= PAC_TOLERANCE,
+		`cream home PAC within ±${PAC_TOLERANCE}: ${creamHome.pac.total} vs ${creamHome.pac.target}`,
+	);
 	const creamCommon = generateRecipe({
 		kind: "cream",
 		totalGrams: 1000,
@@ -1107,16 +1290,40 @@ export function __selfCheck() {
 		kind: "yogurt",
 		totalGrams: 1000,
 		tempKey: "professional",
-		sugarMode: "common",
+		sugarMode: "blend",
 		yogurtFatPercent: 3.5,
 	});
 	assert(
-		Math.abs(yogurt.percents.sugars - 18) < 0.2,
-		`yogurt common sugars 18% got ${yogurt.percents.sugars}`,
+		Math.abs(yogurt.percents.sugars - 18) < 0.5,
+		`yogurt blend sugars 18% got ${yogurt.percents.sugars}`,
+	);
+	assert(
+		Math.abs(yogurt.pac.total - yogurt.pac.target) <= PAC_TOLERANCE,
+		`yogurt blend PAC within ±${PAC_TOLERANCE}: ${yogurt.pac.total} vs ${yogurt.pac.target}`,
 	);
 	assert(
 		yogurt.percents.water > 50,
 		`yogurt water got ${yogurt.percents.water}`,
+	);
+	assert(
+		result.percents.fats >= TARGETS.fatsCream.min - 1 &&
+			result.percents.fats <= TARGETS.fatsCream.max + 1,
+		`cream fats in range got ${result.percents.fats}`,
+	);
+	assert(POD_INDEX.lactose === 40, `lactose POD 40 got ${POD_INDEX.lactose}`);
+	const sorbet = generateRecipe({
+		kind: "sorbet",
+		fruitGrams: 450,
+		tempKey: "professional",
+		sugarMode: "blend",
+	});
+	assert(
+		sorbet.percents.sugars >= 25 && sorbet.percents.sugars <= 30.1,
+		`sorbet sugars 25–30% got ${sorbet.percents.sugars}`,
+	);
+	assert(
+		Math.abs(sorbet.pac.total - sorbet.pac.target) <= PAC_TOLERANCE,
+		`sorbet PAC within ±${PAC_TOLERANCE}: ${sorbet.pac.total} vs ${sorbet.pac.target}`,
 	);
 	console.log("gelato-recipe-maker self-check ok");
 }

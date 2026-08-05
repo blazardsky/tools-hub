@@ -18,6 +18,7 @@ import {
 	labelClass,
 	MIX_PROCEDURE,
 	PAC_INDEX,
+	PAC_TOLERANCE,
 	POD_INDEX,
 	type RecipeKind,
 	RICOTTA_PROCEDURE,
@@ -1196,6 +1197,7 @@ export default function App() {
 											alcohol: "Alcol",
 											water: "Acqua (totale)",
 											sugars: "Zuccheri",
+											fats: "Grassi",
 										}[alert.ingredient]
 									}
 									: {alert.percent}% della miscela
@@ -1264,11 +1266,11 @@ export default function App() {
 									<li>Alcol: {pac.fromAlcohol}</li>
 									<li>
 										Totale: {pac.total}
-										{Math.abs(pac.total - pac.target) <= pac.target * 0.05
-											? " — in target"
+										{Math.abs(pac.total - pac.target) <= PAC_TOLERANCE
+											? ` — in target (±${PAC_TOLERANCE})`
 											: pac.total > pac.target
-												? " — sopra target (scoop più morbido)"
-												: " — sotto target (più sodo)"}
+												? ` — sopra target di ${Math.round((pac.total - pac.target) * 10) / 10} (scoop più morbido)`
+												: ` — sotto target di ${Math.round((pac.target - pac.total) * 10) / 10} (più sodo)`}
 									</li>
 									<li>POD (dolcezza): {result.pod}%</li>
 									{addAlcohol ? (
