@@ -15,13 +15,37 @@ export const TARGETS = {
 } as const;
 
 /**
- * Alert thresholds for optional additives (% of final mix).
- * ponytail: placeholder cutoffs — tune when UI lands / after tasting tests.
+ * Alert thresholds for mix shares (% of final mix).
+ * Water = total water from all ingredients (not only added water).
+ * ponytail: placeholder cutoffs — tune after tasting tests.
  */
 export const ADDITIVE_ALERTS = {
 	panna: { warn: 15, high: 25 },
 	alcohol: { warn: 2, high: 5 },
-	water: { warn: 10, high: 20 },
+	/** Total water content; typical gelato ~55–65%. */
+	water: { warn: 68, high: 75 },
+} as const;
+
+/**
+ * Water fraction of recipe lines (mix water %).
+ * Alcohol: use (100 − ABV) / 100; default ABV 40% → 0.6.
+ * Ricotta: 1 − solids%/100 (from recipe inputs).
+ */
+export const WATER_FRACTION = {
+	milk: 0.875,
+	yogurt: 0.865,
+	lemonJuice: 0.95,
+	/** Cream ~35% MG. */
+	panna: 0.6,
+	water: 1,
+	honey: 0.19,
+	/** Finished invert syrup ~75% solids. */
+	invertedSugar: 0.25,
+	eggYolk: 0.48,
+	fruit: 0.85,
+	skimMilkPowder: 0.04,
+	/** Default when ABV not set. */
+	alcoholDefaultAbv: 40,
 } as const;
 
 /**
@@ -664,8 +688,8 @@ export const SUGAR_MODES = {
 		sucroseOnly: true,
 		useHoney: false,
 		useInvert: false,
-		/** Creams 17–18%; sorbets 22–24% — edible sweetness, not full −18°C PAC. */
-		creamSugarFactor: 0.175,
+		/** Creams/yogurt/ricotta 18%; sorbets 22–24% — edible sweetness, not full −18°C PAC. */
+		creamSugarFactor: 0.18,
 		sorbetSugarFactor: 0.23,
 		hint: "PAC:POD = 1:1 — non si raggiunge il PAC del freezer senza un gusto stucchevole. Preferisci destrosio, invertito o alcol.",
 	},

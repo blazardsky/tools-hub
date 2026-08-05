@@ -1194,7 +1194,8 @@ export default function App() {
 										{
 											panna: "Panna",
 											alcohol: "Alcol",
-											water: "Acqua",
+											water: "Acqua (totale)",
+											sugars: "Zuccheri",
 										}[alert.ingredient]
 									}
 									: {alert.percent}% della miscela

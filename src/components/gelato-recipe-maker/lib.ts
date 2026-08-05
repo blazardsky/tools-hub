@@ -21,6 +21,7 @@ import {
 	saltGramsPerKg,
 	TARGETS,
 	usesTotalGrams,
+	WATER_FRACTION,
 } from "./const";
 
 /** Scale a per-kg dose to an arbitrary mix weight. */
@@ -222,7 +223,7 @@ export type RecipeIngredients = {
 };
 
 export type AdditiveAlert = {
-	ingredient: "panna" | "alcohol" | "water";
+	ingredient: "panna" | "alcohol" | "water" | "sugars";
 	/** Share of final mix weight. */
 	percent: number;
 	severity: "ok" | "warn" | "high";
@@ -271,8 +272,8 @@ export type RecipeResult = {
 	targetTotal: number;
 	actualTotal: number;
 	ingredients: RecipeIngredients;
-	/** Percents of final mix for the three watch ingredients. */
-	percents: { panna: number; alcohol: number; water: number };
+	/** Percents of final mix for watch metrics. */
+	percents: { panna: number; alcohol: number; water: number; sugars: number };
 	alerts: AdditiveAlert[];
 	/** Process / balancing tips (lemon cold-add, stabilizer bump, …). */
 	tips: string[];
@@ -312,6 +313,47 @@ function severity(
 	if (percent >= thresholds.high) return "high";
 	if (percent >= thresholds.warn) return "warn";
 	return "ok";
+}
+
+/** Sugar % vs cream/sorbet target range. */
+function sugarSeverity(
+	percent: number,
+	range: { min: number; max: number },
+): AdditiveAlert["severity"] {
+	if (percent < range.min - 2 || percent > range.max + 3) return "high";
+	if (percent < range.min || percent > range.max) return "warn";
+	return "ok";
+}
+
+/** Total water grams from all watery ingredients (ABV defaults to 40%). */
+function mixWaterGrams(
+	ing: RecipeIngredients,
+	opts: { abvPercent: number; ricottaSolidsPercent: number },
+): number {
+	const abv =
+		ing.alcohol > 0
+			? opts.abvPercent > 0
+				? opts.abvPercent
+				: WATER_FRACTION.alcoholDefaultAbv
+			: 0;
+	const ricottaWater =
+		ing.ricotta > 0
+			? ing.ricotta * Math.max(0, 1 - opts.ricottaSolidsPercent / 100)
+			: 0;
+	return (
+		ing.water * WATER_FRACTION.water +
+		ing.milk * WATER_FRACTION.milk +
+		ing.yogurt * WATER_FRACTION.yogurt +
+		ing.lemonJuice * WATER_FRACTION.lemonJuice +
+		ing.panna * WATER_FRACTION.panna +
+		ing.honey * WATER_FRACTION.honey +
+		ing.invertedSugar * WATER_FRACTION.invertedSugar +
+		ing.eggYolk * WATER_FRACTION.eggYolk +
+		ing.fruit * WATER_FRACTION.fruit +
+		ing.skimMilkPowder * WATER_FRACTION.skimMilkPowder +
+		ricottaWater +
+		ing.alcohol * Math.max(0, 1 - abv / 100)
+	);
 }
 
 function resolveTargetTotal(input: RecipeInput): {
@@ -705,23 +747,50 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		Object.values(ingredients).reduce((a, b) => a + b, 0),
 	);
 
+	const sugarGrams =
+		ingredients.sucrose +
+		ingredients.dextrose +
+		ingredients.honey +
+		(invertDiy?.solidsGrams ?? 0);
+
 	const percents = {
 		panna: pct(ingredients.panna, actualTotal),
 		alcohol: pct(ingredients.alcohol, actualTotal),
-		water: pct(ingredients.water, actualTotal),
+		water: pct(
+			mixWaterGrams(ingredients, {
+				abvPercent: abv,
+				ricottaSolidsPercent,
+			}),
+			actualTotal,
+		),
+		sugars: pct(sugarGrams, actualTotal),
 	};
 
-	const alerts: AdditiveAlert[] = (
-		[
-			["panna", percents.panna, ADDITIVE_ALERTS.panna],
-			["alcohol", percents.alcohol, ADDITIVE_ALERTS.alcohol],
-			["water", percents.water, ADDITIVE_ALERTS.water],
-		] as const
-	).map(([ingredient, percent, thresholds]) => ({
-		ingredient,
-		percent,
-		severity: severity(percent, thresholds),
-	}));
+	const sugarRange =
+		params.liquid === "water" ? TARGETS.sugarsSorbet : TARGETS.sugarsCream;
+
+	const alerts: AdditiveAlert[] = [
+		{
+			ingredient: "panna",
+			percent: percents.panna,
+			severity: severity(percents.panna, ADDITIVE_ALERTS.panna),
+		},
+		{
+			ingredient: "alcohol",
+			percent: percents.alcohol,
+			severity: severity(percents.alcohol, ADDITIVE_ALERTS.alcohol),
+		},
+		{
+			ingredient: "water",
+			percent: percents.water,
+			severity: severity(percents.water, ADDITIVE_ALERTS.water),
+		},
+		{
+			ingredient: "sugars",
+			percent: percents.sugars,
+			severity: sugarSeverity(percents.sugars, sugarRange),
+		},
+	];
 
 	const tips: string[] = [];
 	{
@@ -1014,5 +1083,40 @@ export function __selfCheck() {
 	assert(text.includes("Miscela: 1000 g"), "target weight");
 	assert(text.includes("Latte"), "ingredient row");
 	assert(!text.includes("Caseina"), "no casein by default");
+	assert(
+		result.percents.water > 40,
+		`cream water from milk got ${result.percents.water}`,
+	);
+	assert(
+		result.percents.sugars > 0 &&
+			"sugars" in
+				Object.fromEntries(result.alerts.map((a) => [a.ingredient, a])),
+		"sugars alert present",
+	);
+	const creamCommon = generateRecipe({
+		kind: "cream",
+		totalGrams: 1000,
+		tempKey: "professional",
+		sugarMode: "common",
+	});
+	assert(
+		Math.abs(creamCommon.percents.sugars - 18) < 0.2,
+		`cream common sugars 18% got ${creamCommon.percents.sugars}`,
+	);
+	const yogurt = generateRecipe({
+		kind: "yogurt",
+		totalGrams: 1000,
+		tempKey: "professional",
+		sugarMode: "common",
+		yogurtFatPercent: 3.5,
+	});
+	assert(
+		Math.abs(yogurt.percents.sugars - 18) < 0.2,
+		`yogurt common sugars 18% got ${yogurt.percents.sugars}`,
+	);
+	assert(
+		yogurt.percents.water > 50,
+		`yogurt water got ${yogurt.percents.water}`,
+	);
 	console.log("gelato-recipe-maker self-check ok");
 }
