@@ -1,35 +1,35 @@
 ---
+import ToolLayout from "@layouts/ToolLayout.astro";
 import CookingPot from "@phosphor-icons/core/duotone/cooking-pot-duotone.svg";
 import IceCream from "@phosphor-icons/core/duotone/ice-cream-duotone.svg";
 import NotePencil from "@phosphor-icons/core/duotone/note-pencil-duotone.svg";
 import SealCheck from "@phosphor-icons/core/duotone/seal-check-duotone.svg";
-import ToolLayout from "@layouts/ToolLayout.astro";
 
 const tools = [
-  {
-    href: "/openbadge-verifier",
-    name: "OpenBadge Verifier",
-    description: "Verify Open Badges locally in your browser.",
-    Icon: SealCheck,
-  },
-  {
-    href: "/quick-notes",
-    name: "Quick Notes",
-    description: "A fast notepad that saves in your browser.",
-    Icon: NotePencil,
-  },
-  {
-    href: "/recipe-converter",
-    name: "Recipe Converter",
-    description: "Convert recipe quantities and units.",
-    Icon: CookingPot,
-  },
-  {
-    href: "/gelato-recipe-maker",
-    name: "Creatore Ricette Gelato",
-    description: "Genera quantità bilanciate di gelato e sorbetto in grammi.",
-    Icon: IceCream,
-  },
+	// {
+	//   href: "/openbadge-verifier",
+	//   name: "OpenBadge Verifier",
+	//   description: "Verify Open Badges locally in your browser.",
+	//   Icon: SealCheck,
+	// },
+	{
+		href: "/quick-notes",
+		name: "Quick Notes",
+		description: "A fast notepad that saves in your browser.",
+		Icon: NotePencil,
+	},
+	{
+		href: "/recipe-converter",
+		name: "Recipe Converter",
+		description: "Convert recipe quantities and units.",
+		Icon: CookingPot,
+	},
+	{
+		href: "/gelato-recipe-maker",
+		name: "Creatore Ricette Gelato (IN ITALIAN)",
+		description: "Genera quantità bilanciate di gelato e sorbetto in grammi.",
+		Icon: IceCream,
+	},
 ] as const;
 ---
 

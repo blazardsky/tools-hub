@@ -1,8 +1,8 @@
 ---
 type Props = {
-  linkHome?: boolean;
-  invert?: boolean;
-  size?: "xs" | "sm" | "md" | "lg" | "xl";
+	linkHome?: boolean;
+	invert?: boolean;
+	size?: "xs" | "sm" | "md" | "lg" | "xl";
 };
 
 const { linkHome, invert, size = "md" }: Props = Astro.props;
@@ -10,11 +10,11 @@ const { linkHome, invert, size = "md" }: Props = Astro.props;
 const Tag = linkHome ? "a" : "span";
 const linkAttrs = linkHome ? { href: "/", ariaLabel: "Home" } : {};
 const logoSizes = {
-  xs: "1.5rem",
-  sm: "2rem",
-  md: "3rem",
-  lg: "4rem",
-  xl: "5rem",
+	xs: "1.5rem",
+	sm: "2rem",
+	md: "3rem",
+	lg: "4rem",
+	xl: "5rem",
 };
 ---
 

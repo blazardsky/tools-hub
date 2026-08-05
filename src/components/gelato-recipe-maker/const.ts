@@ -673,14 +673,31 @@ export const SUGAR_MODES = {
 
 export type SugarMode = keyof typeof SUGAR_MODES;
 
+/**
+ * DIY invert-sugar batch ratios (per 100 g sucrose) and finished syrup solids.
+ * Final syrup ≈ 75% sugars / 25% water after heating (part of process water evaporates).
+ */
+export const INVERT_SUGAR_DIY = {
+	/** Finished syrup sugar solids (rest is bound water). */
+	solidsPercent: 75,
+	/** Process water per 100 g sucrose (before evaporation). */
+	waterPer100gSucrose: 43,
+	citricAcidPer100gSucrose: 0.43,
+	/** Filtered lemon juice alternative to citric acid (~½ tsp). */
+	lemonJuicePer100gSucrose: 2.5,
+	/** Neutralize residual acid so dairy doesn't curdle. */
+	bicarbonatePer100gSucrose: 0.5,
+	heatC: [80, 85] as const,
+} as const;
+
 /** DIY invert-sugar procedure (shown when sucrose-only or invert mode). */
 export const INVERT_SUGAR_HOWTO = {
 	summary:
-		"Lo zucchero invertito spezza il saccarosio in glucosio + fruttosio: PAC 190 (vs 100) e blocca la cristallizzazione.",
+		"Lo zucchero invertito spezza il saccarosio in glucosio + fruttosio: PAC 190 (vs 100) e blocca la cristallizzazione. Lo sciroppo finito è ~75% solidi / 25% acqua — l'acqua legata sposta latte/acqua in formula.",
 	steps: [
-		"Sciogli il saccarosio in acqua e scalda con un po' di acido (acido citrico, cremor tartaro o succo di limone).",
-		"Acido + calore spezzano il saccarosio in glucosio e fruttosio.",
-		"Formula semplice: scalda una soluzione zucchero–acqua a 80°C con un pizzico di acido citrico; ~30 min → >90% di inversione, ok per uso domestico.",
+		`Per 100 g di saccarosio: ${INVERT_SUGAR_DIY.waterPer100gSucrose} g acqua + ${INVERT_SUGAR_DIY.citricAcidPer100gSucrose} g acido citrico (o ~${INVERT_SUGAR_DIY.lemonJuicePer100gSucrose} g succo di limone filtrato).`,
+		`Scalda a ${INVERT_SUGAR_DIY.heatC[0]}–${INVERT_SUGAR_DIY.heatC[1]}°C finché i solidi sono ~${INVERT_SUGAR_DIY.solidsPercent}% (parte dell'acqua evapora).`,
+		`A fine inversione: ${INVERT_SUGAR_DIY.bicarbonatePer100gSucrose} g bicarbonato di sodio ogni 100 g di saccarosio iniziali per neutralizzare l'acidità residua.`,
 	],
 } as const;
 
@@ -971,7 +988,7 @@ export const KIND_OPTIONS: {
 	},
 	{
 		value: "cream",
-		label: "Base bianca (crema)",
+		label: "Base bianca",
 		hint: "Senza frutta — imposta il peso desiderato della miscela",
 	},
 	{
@@ -999,7 +1016,7 @@ export const INGREDIENT_ROWS = [
 	{ key: "skimMilkPowder", label: "Latte magro in polvere" },
 	{ key: "sucrose", label: "Saccarosio" },
 	{ key: "dextrose", label: "Destrosio" },
-	{ key: "invertedSugar", label: "Zucchero invertito" },
+	{ key: "invertedSugar", label: "Zucchero invertito (sciroppo)" },
 	{ key: "honey", label: "Miele" },
 	{ key: "panna", label: "Panna (35%)" },
 	{ key: "eggYolk", label: "Tuorlo d'uovo" },

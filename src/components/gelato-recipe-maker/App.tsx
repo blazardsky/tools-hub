@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { ActionsBar } from "@/components/ActionsBar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -9,6 +10,7 @@ import {
 	fieldClass,
 	INGREDIENT_DATA,
 	INGREDIENT_ROWS,
+	INVERT_SUGAR_DIY,
 	INVERT_SUGAR_HOWTO,
 	KIND_OPTIONS,
 	LACTOSE_FREE,
@@ -29,7 +31,14 @@ import {
 	usesTotalGrams,
 	YOGURT_PROCEDURE,
 } from "./const";
-import { doseFor, generateRecipe, type RecipeResult } from "./lib";
+import {
+	doseFor,
+	downloadTextFile,
+	formatRecipeText,
+	generateRecipe,
+	type RecipeResult,
+	recipeFilename,
+} from "./lib";
 
 function NumberField({
 	id,
@@ -111,6 +120,8 @@ export default function App() {
 	const [totalGrams, setTotalGrams] = useState("1000");
 	const [tempKey, setTempKey] = useState<ServiceTempKey>("professional");
 	const [sugarMode, setSugarMode] = useState<SugarMode>("blend");
+	/** DIY invert: neutralize residual acid with bicarbonate (default on). */
+	const [invertNeutralize, setInvertNeutralize] = useState(true);
 	const [addAlcohol, setAddAlcohol] = useState(false);
 	const [alcoholGrams, setAlcoholGrams] = useState("");
 	const [alcoholAbv, setAlcoholAbv] = useState("40");
@@ -143,6 +154,7 @@ export default function App() {
 	const [ricottaSolidsPercent, setRicottaSolidsPercent] = useState(
 		String(INGREDIENT_DATA.ricotta.formula.cow.solidsPercent),
 	);
+	const [recipeName, setRecipeName] = useState("");
 
 	const isCream = kind === "cream";
 	const isYogurt = kind === "yogurt";
@@ -180,6 +192,8 @@ export default function App() {
 				totalGrams: fixedTotal ? total : undefined,
 				tempKey,
 				sugarMode,
+				invertNeutralize:
+					sugarMode === "inverted" ? invertNeutralize : undefined,
 				alcoholGrams: addAlcohol ? parseGrams(alcoholGrams) : 0,
 				alcoholAbv: addAlcohol && Number.isFinite(abv) && abv > 0 ? abv : 0,
 				extraPannaGrams: addPanna ? parseGrams(extraPannaGrams) : 0,
@@ -217,6 +231,7 @@ export default function App() {
 		totalGrams,
 		tempKey,
 		sugarMode,
+		invertNeutralize,
 		addAlcohol,
 		alcoholGrams,
 		alcoholAbv,
@@ -251,6 +266,7 @@ export default function App() {
 		setTotalGrams("1000");
 		setTempKey("professional");
 		setSugarMode("blend");
+		setInvertNeutralize(true);
 		setAddAlcohol(false);
 		setAlcoholGrams("");
 		setAlcoholAbv("40");
@@ -281,6 +297,37 @@ export default function App() {
 		);
 		setRicottaSolidsPercent(
 			String(INGREDIENT_DATA.ricotta.formula.cow.solidsPercent),
+		);
+		setRecipeName("");
+	};
+
+	const downloadRecipe = () => {
+		if (!result) return;
+		const caseinGrams =
+			addAlcohol && useCaseinAdvice && result.ingredients.alcohol > 0
+				? Math.round(
+						doseFor(CASEIN_ADVICE.gramsPerKg, result.actualTotal) * 10,
+					) / 10
+				: 0;
+		const text = formatRecipeText({
+			name: recipeName,
+			result,
+			tempKey,
+			savory,
+			alcoholAbv: Number(alcoholAbv) || 0,
+			greekYogurt,
+			yogurtFatPercent: Number(yogurtFatPercent) || 0,
+			ricottaMilk,
+			ricottaPercent: Number(ricottaPercent) || 0,
+			ricottaFatPercent: Number(ricottaFatPercent) || 0,
+			ricottaSlngPercent: Number(ricottaSlngPercent) || 0,
+			ricottaSolidsPercent: Number(ricottaSolidsPercent) || 0,
+			caseinGrams,
+			invertNeutralize: sugarMode === "inverted" ? invertNeutralize : undefined,
+		});
+		downloadTextFile(
+			recipeFilename(recipeName, kind, result.targetTotal),
+			text,
 		);
 	};
 
@@ -699,10 +746,16 @@ export default function App() {
 							{result.ingredients.invertedSugar > 0 ? (
 								<>
 									{" · "}
-									invertito{" "}
+									invertito (sciroppo){" "}
 									<span className="tabular-nums text-foreground">
 										{result.ingredients.invertedSugar} g
 									</span>
+									{result.invertDiy ? (
+										<span className="text-muted-foreground">
+											{" "}
+											({result.invertDiy.solidsGrams} g solidi)
+										</span>
+									) : null}
 								</>
 							) : null}
 							{result.ingredients.honey > 0 ? (
@@ -844,17 +897,68 @@ export default function App() {
 						</div>
 					) : null}
 					{sugarMode === "inverted" ? (
-						<details className="text-sm text-muted-foreground">
-							<summary className="cursor-pointer font-medium text-foreground">
-								Come fare lo zucchero invertito
-							</summary>
-							<p className="mt-2">{INVERT_SUGAR_HOWTO.summary}</p>
-							<ol className="mt-2 list-decimal space-y-1 pl-5">
-								{INVERT_SUGAR_HOWTO.steps.map((step) => (
-									<li key={step}>{step}</li>
-								))}
-							</ol>
-						</details>
+						<div className="space-y-3">
+							<label className="flex cursor-pointer items-start gap-2 text-sm">
+								<input
+									type="checkbox"
+									checked={invertNeutralize}
+									onChange={(e) => setInvertNeutralize(e.target.checked)}
+									className="mt-1"
+								/>
+								<span>
+									<span className="block font-medium text-foreground">
+										Neutralizza con bicarbonato
+									</span>
+									<span className="block text-muted-foreground">
+										Consigliato. Se disattivi, l&apos;acidità residua può alzare
+										il neutro (×
+										{1 + INGREDIENT_DATA.neutro.formula.acidBump}); sotto 1 g di
+										effetto viene ignorata. Il limone/acido DIY non entra in
+										lista ingredienti.
+									</span>
+								</span>
+							</label>
+							<details className="text-sm text-muted-foreground" open>
+								<summary className="cursor-pointer font-medium text-foreground">
+									Come fare lo zucchero invertito
+								</summary>
+								<p className="mt-2">{INVERT_SUGAR_HOWTO.summary}</p>
+								{result?.invertDiy ? (
+									<ul className="mt-2 list-disc space-y-1 pl-5 tabular-nums text-foreground">
+										<li>
+											Sciroppo in ricetta: {result.invertDiy.syrupGrams} g (~
+											{INVERT_SUGAR_DIY.solidsPercent}% solidi ={" "}
+											{result.invertDiy.solidsGrams} g; acqua legata{" "}
+											{result.invertDiy.waterInSyrup} g)
+										</li>
+										<li>
+											Partenza: {result.invertDiy.sucrose} g saccarosio +{" "}
+											{result.invertDiy.processWater} g acqua
+										</li>
+										<li>
+											Acido: {result.invertDiy.citricAcid} g acido citrico,
+											oppure {result.invertDiy.lemonJuice} g succo di limone
+											filtrato
+										</li>
+										{invertNeutralize ? (
+											<li>
+												Dopo inversione: {result.invertDiy.bicarbonate} g
+												bicarbonato di sodio (neutralizza)
+											</li>
+										) : (
+											<li>
+												Senza bicarbonato: acidità residua in formula (neutro)
+											</li>
+										)}
+									</ul>
+								) : null}
+								<ol className="mt-2 list-decimal space-y-1 pl-5">
+									{INVERT_SUGAR_HOWTO.steps.map((step) => (
+										<li key={step}>{step}</li>
+									))}
+								</ol>
+							</details>
+						</div>
 					) : null}
 				</fieldset>
 
@@ -1262,6 +1366,26 @@ export default function App() {
 					</table>
 				</section>
 			) : null}
+
+			<ActionsBar>
+				<input
+					type="text"
+					value={recipeName}
+					onChange={(e) => setRecipeName(e.target.value)}
+					placeholder="Nome ricetta (opzionale)"
+					aria-label="Nome ricetta"
+					className={cn(fieldClass, "h-7 max-w-xs flex-1 text-xs")}
+				/>
+				<Button
+					type="button"
+					variant="outline"
+					size="xs"
+					disabled={!result}
+					onClick={downloadRecipe}
+				>
+					Scarica ricetta
+				</Button>
+			</ActionsBar>
 		</div>
 	);
 }

@@ -136,40 +136,6 @@
 	background: var(--muted);
 }
 
-.qn-footer {
-	position: sticky;
-	bottom: 0;
-	z-index: 20;
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	gap: 1rem;
-	width: 100vw;
-	margin-left: calc(50% - 50vw);
-	margin-top: 1rem;
-	padding: 0.2rem 1rem;
-	border-top: 1px solid var(--border);
-	background: var(--background);
-	font-size: 0.75rem;
-	line-height: 1.3;
-}
-
-.qn-footer-left {
-	display: flex;
-	align-items: center;
-	gap: 0.35rem;
-}
-
-.qn-footer-sep {
-	color: var(--muted-foreground);
-	user-select: none;
-}
-
-.qn-footer-status {
-	color: var(--muted-foreground);
-	text-align: right;
-}
-
 .qn-slash {
 	position: fixed;
 	z-index: 50;

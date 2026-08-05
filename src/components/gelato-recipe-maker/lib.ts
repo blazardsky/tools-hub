@@ -6,7 +6,10 @@ import {
 	ALCOHOL_PAC_PER_PURE_GRAM,
 	FRUIT_TO_TOTAL,
 	INGREDIENT_DATA,
+	INGREDIENT_ROWS,
+	INVERT_SUGAR_DIY,
 	KIND,
+	KIND_OPTIONS,
 	PAC_INDEX,
 	POD_INDEX,
 	type RecipeKind,
@@ -170,6 +173,11 @@ export type RecipeInput = {
 	extraWaterGrams?: number;
 	/** Extra lemon juice beyond formula (displaces milk/water; acid bumps neutro ×1.25). */
 	extraLemonGrams?: number;
+	/**
+	 * When sugarMode is inverted: neutralize DIY acid with bicarbonate (default true).
+	 * If false, residual acidity can bump neutro (ignored if delta < 1 g). Does not add lemon to the ingredient list.
+	 */
+	invertNeutralize?: boolean;
 	/** Egg yolk as emulsifier/neutro (displaces milk/water; reduces neutro dose). */
 	eggYolkGrams?: number;
 	/** Savory / gastronomic — higher salt dose (4–8 g/kg cream, 8 g/kg sorbet). */
@@ -240,6 +248,23 @@ export type SucroseAdvisory = {
 	podWithInvert: number;
 };
 
+/** DIY batch to produce the invert syrup weighed into the mix. */
+export type InvertDiyBatch = {
+	/** Sugar solids (PAC/POD basis). */
+	solidsGrams: number;
+	/** Finished syrup weight (~75% solids) added to the mix. */
+	syrupGrams: number;
+	/** Bound water in syrup — displaces milk/water in formula. */
+	waterInSyrup: number;
+	/** Starting sucrose for the DIY batch. */
+	sucrose: number;
+	/** Process water before evaporation. */
+	processWater: number;
+	lemonJuice: number;
+	citricAcid: number;
+	bicarbonate: number;
+};
+
 export type RecipeResult = {
 	kind: RecipeKind;
 	sugarMode: SugarMode;
@@ -256,7 +281,26 @@ export type RecipeResult = {
 	pod: number;
 	/** Set when sugarMode is common — sucrose 1:1 limit + alternatives. */
 	sucroseAdvisory: SucroseAdvisory | null;
+	/** DIY invert batch when sugarMode is inverted (and invert > 0). */
+	invertDiy: InvertDiyBatch | null;
 };
+
+/** Scale DIY invert ratios from sugar solids → finished ~75% syrup. */
+export function invertDiyFromSolids(solidsGrams: number): InvertDiyBatch {
+	const solidsFrac = INVERT_SUGAR_DIY.solidsPercent / 100;
+	const syrupGrams = solidsGrams <= 0 ? 0 : solidsGrams / solidsFrac;
+	const scale = solidsGrams / 100;
+	return {
+		solidsGrams: round(solidsGrams),
+		syrupGrams: round(syrupGrams),
+		waterInSyrup: round(Math.max(0, syrupGrams - solidsGrams)),
+		sucrose: round(solidsGrams),
+		processWater: round(INVERT_SUGAR_DIY.waterPer100gSucrose * scale),
+		lemonJuice: round(INVERT_SUGAR_DIY.lemonJuicePer100gSucrose * scale, 2),
+		citricAcid: round(INVERT_SUGAR_DIY.citricAcidPer100gSucrose * scale, 2),
+		bicarbonate: round(INVERT_SUGAR_DIY.bicarbonatePer100gSucrose * scale, 2),
+	};
+}
 
 const pct = (part: number, total: number) =>
 	total <= 0 ? 0 : round((part / total) * 100, 2);
@@ -472,7 +516,10 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		mode.useHoney || mode.useInvert || mode.sucroseOnly || preferSucrose
 			? 0
 			: scaled.highPac;
-	const invertedSugar = mode.useInvert && !preferSucrose ? scaled.highPac : 0;
+	const invertSolids = mode.useInvert && !preferSucrose ? scaled.highPac : 0;
+	const invertDiy = invertSolids > 0 ? invertDiyFromSolids(invertSolids) : null;
+	// Syrup weight into the mix (includes ~25% bound water).
+	const invertedSugar = invertDiy?.syrupGrams ?? 0;
 	const honey = mode.useHoney && !preferSucrose ? scaled.highPac : 0;
 
 	const yogurt = targetTotal * params.yogurtFactor;
@@ -503,8 +550,10 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		input.ricottaSolidsPercent ?? ricottaPreset.solidsPercent,
 	);
 	const extraLemon = Math.max(0, input.extraLemonGrams ?? 0);
+	// DIY invert lemon stays out of the ingredient list — process acid only.
 	const lemonJuice = targetTotal * params.lemonPerKg + extraLemon;
 	const eggYolk = Math.max(0, input.eggYolkGrams ?? 0);
+	const invertNeutralize = input.invertNeutralize !== false;
 
 	const nf = INGREDIENT_DATA.neutro.formula;
 	const kindKey =
@@ -526,16 +575,29 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 	if (alcohol > 0 && isDairyWithAlcoholBump) {
 		neutroPerKg = Math.max(neutroPerKg, nf.alcoholCreamGramsPerKg);
 	}
-	const hasAcid = input.kind === "fruit_acid" || lemonJuice > 0;
-	const acidApplied = hasAcid;
+	const formulaAcid = input.kind === "fruit_acid" || lemonJuice > 0;
+	const invertResidualAcid = invertDiy != null && !invertNeutralize;
 	const alcoholSorbetApplied = alcohol > 0 && input.kind === "sorbet";
-	if (acidApplied) neutroPerKg *= 1 + nf.acidBump;
 	if (alcoholSorbetApplied) neutroPerKg *= 1 + nf.alcoholSorbetBump;
 	const yolkNeutroEq =
 		(eggYolk / INGREDIENT_DATA.eggYolk.formula.yolkGramsEach) *
 		INGREDIENT_DATA.eggYolk.formula.neutroEquivalentPerYolkGrams;
-	const neutro = Math.max(0, (neutroPerKg * targetTotal) / 1000 - yolkNeutroEq);
-
+	const neutroFrom = (perKg: number) =>
+		Math.max(0, (perKg * targetTotal) / 1000 - yolkNeutroEq);
+	const neutroBase = neutroFrom(neutroPerKg);
+	const neutroAcid = neutroFrom(neutroPerKg * (1 + nf.acidBump));
+	let acidApplied = formulaAcid;
+	let neutro = neutroBase;
+	if (formulaAcid) {
+		neutro = neutroAcid;
+	} else if (invertResidualAcid) {
+		// Residual invert acidity: apply ×1.25 only if it moves neutro by ≥ 1 g.
+		const delta = neutroAcid - neutroBase;
+		if (delta >= 1) {
+			neutro = neutroAcid;
+			acidApplied = true;
+		}
+	}
 	const extraPanna = Math.max(0, input.extraPannaGrams ?? 0);
 	const extraWater = Math.max(0, input.extraWaterGrams ?? 0);
 
@@ -713,6 +775,27 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 			"Aggiungi il succo di limone solo a freddo (≤ 2–4°C), preferibilmente in mantecatura a miscela già maturata — a pH < 5 la caseina precipita (taglio del latte).",
 		);
 	}
+	if (invertDiy) {
+		const diyAcid = `${invertDiy.lemonJuice} g limone (o ${invertDiy.citricAcid} g acido citrico)`;
+		const diyCore = `Zucchero invertito: ${invertDiy.syrupGrams} g sciroppo (~${INVERT_SUGAR_DIY.solidsPercent}% solidi = ${invertDiy.solidsGrams} g; acqua legata ${invertDiy.waterInSyrup} g già sottratta da latte/acqua). Fai da te: ${invertDiy.sucrose} g saccarosio + ${invertDiy.processWater} g acqua + ${diyAcid} a ${INVERT_SUGAR_DIY.heatC[0]}–${INVERT_SUGAR_DIY.heatC[1]}°C`;
+		if (invertNeutralize) {
+			tips.push(
+				`${diyCore}; a fine ${invertDiy.bicarbonate} g bicarbonato per neutralizzare.`,
+			);
+		} else {
+			const invertBumped = acidApplied && !formulaAcid;
+			tips.push(
+				invertBumped
+					? `${diyCore}. Acidità residua (non neutralizzata): neutro ×${1 + nf.acidBump}. Il limone/acido DIY non compare in lista ingredienti.`
+					: `${diyCore}. Acidità residua non neutralizzata${formulaAcid ? ` (neutro già ×${1 + nf.acidBump} da acido in formula)` : " (effetto neutro < 1 g: ignorato)"}. Il limone/acido DIY non compare in lista ingredienti.`,
+			);
+			if (params.liquid === "milk") {
+				tips.push(
+					"Acidità residua nello sciroppo invertito con latte: rischio taglio della caseina — meglio neutralizzare col bicarbonato.",
+				);
+			}
+		}
+	}
 	if (eggYolk > 0) {
 		const yolkG = INGREDIENT_DATA.eggYolk.formula.yolkGramsEach;
 		const yolks = round(eggYolk / yolkG, 1);
@@ -736,7 +819,8 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		sucrose: ingredients.sucrose,
 		dextrose: ingredients.dextrose,
 		honey: ingredients.honey,
-		invertedSugar: ingredients.invertedSugar,
+		// PAC on sugar solids, not full syrup weight.
+		invertedSugar: invertDiy?.solidsGrams ?? 0,
 		lemonJuice: ingredients.lemonJuice,
 		salt: ingredients.salt,
 		alcoholGrams: ingredients.alcohol,
@@ -747,7 +831,7 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		sucrose: ingredients.sucrose,
 		dextrose: ingredients.dextrose,
 		honey: ingredients.honey,
-		invertedSugar: ingredients.invertedSugar,
+		invertedSugar: invertDiy?.solidsGrams ?? 0,
 		lemonJuice: ingredients.lemonJuice,
 	});
 
@@ -772,5 +856,163 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		pac,
 		pod,
 		sucroseAdvisory,
+		invertDiy,
 	};
+}
+
+/** Filename slug: lowercase, no accents, spaces → `-`. */
+export function recipeSlug(raw: string): string {
+	const s = raw
+		.normalize("NFD")
+		.replace(/\p{M}/gu, "")
+		.toLowerCase()
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "");
+	return s || "ricetta";
+}
+
+export function recipeFilename(
+	name: string | undefined,
+	kind: RecipeKind,
+	targetTotal: number,
+): string {
+	const kindLabel = KIND_OPTIONS.find((o) => o.value === kind)?.label ?? kind;
+	const base = name?.trim()
+		? recipeSlug(name)
+		: `ricetta-${recipeSlug(kindLabel)}`;
+	return `${base}-${Math.round(targetTotal)}g.txt`;
+}
+
+export type RecipeExportOpts = {
+	name?: string;
+	result: RecipeResult;
+	tempKey: ServiceTempKey;
+	savory: boolean;
+	alcoholAbv: number;
+	greekYogurt: boolean;
+	yogurtFatPercent: number;
+	ricottaMilk: RicottaMilk;
+	ricottaPercent: number;
+	ricottaFatPercent: number;
+	ricottaSlngPercent: number;
+	ricottaSolidsPercent: number;
+	/** Casein advice grams; omit or 0 to skip the line. */
+	caseinGrams?: number;
+	/** Only meaningful when sugarMode is inverted. */
+	invertNeutralize?: boolean;
+};
+
+/** Compact lab text: header + formula settings + ingredient doses. */
+export function formatRecipeText(opts: RecipeExportOpts): string {
+	const { result } = opts;
+	const kindLabel =
+		KIND_OPTIONS.find((o) => o.value === result.kind)?.label ?? result.kind;
+	const temp = SERVICE_TEMP[opts.tempKey];
+	const sugar = SUGAR_MODES[result.sugarMode];
+	const lines: string[] = [];
+
+	if (opts.name?.trim()) lines.push(opts.name.trim());
+	lines.push(`Tipo: ${kindLabel}`);
+	lines.push(`Miscela: ${result.targetTotal} g`);
+	lines.push(`Servizio: ${temp.label}`);
+	lines.push(`Zuccheri: ${sugar.label}`);
+
+	if (opts.savory) lines.push("Salato: sì");
+	if (result.ingredients.alcohol > 0 && opts.alcoholAbv > 0) {
+		lines.push(`Alcol: ${opts.alcoholAbv}%`);
+	}
+	if (result.kind === "yogurt") {
+		lines.push(`Yogurt: ${opts.yogurtFatPercent}% MG`);
+	}
+	if (result.kind === "ricotta") {
+		const milk = opts.ricottaMilk === "sheep" ? "pecora" : "vaccina";
+		lines.push(
+			`Ricotta: ${milk} · ${opts.ricottaPercent}% mix · ${opts.ricottaFatPercent}% MG · ${opts.ricottaSlngPercent}% SLNG · ${opts.ricottaSolidsPercent}% solidi`,
+		);
+	}
+	if (result.sugarMode === "inverted") {
+		lines.push(
+			opts.invertNeutralize
+				? "Invertito: neutralizzato (bicarbonato)"
+				: "Invertito: acidità residua",
+		);
+	}
+
+	const rows: { label: string; grams: number }[] = [];
+	for (const { key, label } of INGREDIENT_ROWS) {
+		const grams = result.ingredients[key];
+		if (grams <= 0) continue;
+		const rowLabel =
+			key === "yogurt"
+				? `${opts.greekYogurt ? "Yogurt greco" : "Yogurt"} (${opts.yogurtFatPercent}% MG)`
+				: key === "ricotta"
+					? `Ricotta ${opts.ricottaMilk === "sheep" ? "pecora" : "vaccina"} (${opts.ricottaFatPercent}% MG)`
+					: label;
+		rows.push({ label: rowLabel, grams });
+	}
+	if (opts.caseinGrams && opts.caseinGrams > 0) {
+		rows.push({ label: "Caseina (consigliata)", grams: opts.caseinGrams });
+	}
+
+	const width = Math.max(...rows.map((r) => r.label.length), 8);
+	lines.push("—");
+	for (const row of rows) {
+		lines.push(`${row.label.padEnd(width)}  ${row.grams} g`);
+	}
+	return `${lines.join("\n")}\n`;
+}
+
+export function downloadTextFile(filename: string, text: string): void {
+	const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+	const url = URL.createObjectURL(blob);
+	const a = document.createElement("a");
+	a.href = url;
+	a.download = filename;
+	a.click();
+	URL.revokeObjectURL(url);
+}
+
+/** Self-check — run: npx tsx -e "import { __selfCheck } from './src/components/gelato-recipe-maker/lib.ts'; __selfCheck()" */
+export function __selfCheck() {
+	const assert = (ok: boolean, msg: string) => {
+		if (!ok) throw new Error(msg);
+	};
+	assert(recipeSlug("Limone Basilico!") === "limone-basilico", "slug");
+	assert(
+		recipeSlug("Frutta acida (pH < 5)") === "frutta-acida-ph-5",
+		"slug kind",
+	);
+	assert(
+		recipeFilename("Limone", "fruit_acid", 1100) === "limone-1100g.txt",
+		"named file",
+	);
+	assert(
+		recipeFilename("", "cream", 1000) === "ricetta-base-bianca-1000g.txt",
+		"auto file",
+	);
+	const result = generateRecipe({
+		kind: "cream",
+		totalGrams: 1000,
+		tempKey: "professional",
+		sugarMode: "blend",
+	});
+	const text = formatRecipeText({
+		name: "Test",
+		result,
+		tempKey: "professional",
+		savory: false,
+		alcoholAbv: 40,
+		greekYogurt: false,
+		yogurtFatPercent: 3.5,
+		ricottaMilk: "cow",
+		ricottaPercent: 20,
+		ricottaFatPercent: 11,
+		ricottaSlngPercent: 7,
+		ricottaSolidsPercent: 25,
+	});
+	assert(text.includes("Tipo: Base bianca"), "kind header");
+	assert(text.includes("Miscela: 1000 g"), "target weight");
+	assert(text.includes("Latte"), "ingredient row");
+	assert(!text.includes("Caseina"), "no casein by default");
+	console.log("gelato-recipe-maker self-check ok");
 }

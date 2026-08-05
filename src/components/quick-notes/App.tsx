@@ -9,6 +9,7 @@ import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Footnote, FootnoteReference, Footnotes } from "tiptap-footnotes";
+import { ActionsBar } from "@/components/ActionsBar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { EMPTY_DOC, FOCUS_CLASS } from "./const";
@@ -209,12 +210,15 @@ export default function App() {
 				<EditorContent editor={editor} />
 			</div>
 
-			<div className="qn-footer" role="status">
-				<div className="qn-footer-left">
+			<ActionsBar role="status">
+				<div className="flex items-center gap-1.5">
 					<Button type="button" variant="ghost" size="xs" onClick={clearNotes}>
 						Clear
 					</Button>
-					<span className="qn-footer-sep" aria-hidden="true">
+					<span
+						className="select-none text-muted-foreground"
+						aria-hidden="true"
+					>
 						·
 					</span>
 					<Button
@@ -227,10 +231,10 @@ export default function App() {
 						{focusMode ? "Exit fullscreen" : "Fullscreen"}
 					</Button>
 				</div>
-				<span className="qn-footer-status">
+				<span className="text-right text-muted-foreground">
 					{saveStatusText(dirty, secondsLeft)}
 				</span>
-			</div>
+			</ActionsBar>
 		</div>
 	);
 }

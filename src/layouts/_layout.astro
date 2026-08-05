@@ -2,12 +2,7 @@
 import BaseHead from "@components/BaseHead.astro";
 import { SITE_DESCRIPTION, SITE_TITLE } from "../consts";
 
-const {
-  title,
-  description,
-  lang = "en",
-  tag,
-} = Astro.props;
+const { title, description, lang = "en", tag } = Astro.props;
 ---
 
 <html lang={lang}>
