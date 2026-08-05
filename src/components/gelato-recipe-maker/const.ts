@@ -140,7 +140,7 @@ export const INGREDIENT_DATA = {
 		notes:
 			"Zucchero di riferimento (disaccaride); cristallizza a basse temperature; ottima solubilità (204 g in 100 g acqua a 20°C); 4 kcal/g. Nei liquori si preferisce quasi solo saccarosio (PAC 100 < destrosio/invertito 190) per non far sciogliere il gelato.",
 		dosage:
-			"Creme: dolcezza rif. ~18%, zuccheri totali 17–22% (formula ~18%; sola saccarosio ~17,5%). Sorbetti: +5–8% vs creme → 22–25% (fino al 30%; formula ~25%; sola saccarosio ~23%). Liquore: ~15–16% quasi solo saccarosio. Share formula 80% creme / 70% sorbetto (100% se sola saccarosio o con alcol).",
+			"Creme: dolcezza rif. ~18%, zuccheri totali 17–22% (formula ~18%; sola saccarosio ~17,5%). Sorbetti: +5–8% vs creme → 22–25% (fino al 30%; formula ~25%; sola saccarosio ~23%). Liquore: ~15–16% zuccheri (PAC in parte dall'alcol). Share formula 80% creme / 70% sorbetto (100% se sola saccarosio).",
 	},
 	dextrose: {
 		label: "Destrosio (glucosio)",
@@ -894,13 +894,6 @@ export const RICOTTA_PROCEDURE = {
  */
 export const ALCOHOL_PAC_PER_PURE_GRAM =
 	INGREDIENT_DATA.alcohol.formula.pacPerPureGram;
-
-/** Recipe tweaks when alcohol is in the mix (casein is advice only — not auto-dosed). */
-export const ALCOHOL_MIX_TWEAKS = {
-	stabilizerBump: INGREDIENT_DATA.alcohol.formula.stabilizerBump,
-	/** Prefer sucrose (PAC 100); avoid high-PAC sugars (dextrose, invert). */
-	preferSucrose: true,
-} as const;
 
 /**
  * Pure casein (sodium caseinate spray) — advice only, not an ingredient line.

@@ -2,7 +2,6 @@
 
 import {
 	ADDITIVE_ALERTS,
-	ALCOHOL_MIX_TWEAKS,
 	ALCOHOL_PAC_PER_PURE_GRAM,
 	FAT_FRACTION,
 	FRUIT_TO_TOTAL,
@@ -467,6 +466,8 @@ function lmpForMixSlng(opts: {
 /**
  * Hit desired sugar PAC while keeping total sugars in [min, max], prefer preferred mass.
  * Retunes sucrose / high-PAC share first; only then moves mass within the range.
+ * When PAC is low enough that mass must drop, keep `preferredShare` (never collapse to
+ * sucrose-only unless preferredShare is 1).
  */
 function sugarsBalanced(opts: {
 	desiredPac: number;
@@ -475,8 +476,8 @@ function sugarsBalanced(opts: {
 	minSugar: number;
 	maxSugar: number;
 	highPacIndex: number;
-	/** Lock sucrose share (1 = solo saccarosio). */
-	fixedShare?: number;
+	/** Sucrose fraction of sugars when mass must drop (KIND.sucroseShare). */
+	preferredShare: number;
 }): { sucrose: number; highPac: number } {
 	const mix = opts.mixGrams;
 	const desired = opts.desiredPac;
@@ -484,18 +485,9 @@ function sugarsBalanced(opts: {
 	const minS = Math.max(0, opts.minSugar);
 	const maxS = Math.max(minS, opts.maxSugar);
 	const pref = Math.min(maxS, Math.max(minS, opts.preferredSugar));
+	const share = Math.min(1, Math.max(0, opts.preferredShare));
 
 	if (desired <= 0 || mix <= 0) return { sucrose: 0, highPac: 0 };
-
-	if (opts.fixedShare != null) {
-		const share = Math.min(1, Math.max(0, opts.fixedShare));
-		const pacPerGram = (share + (1 - share) * idx) * (1000 / mix);
-		const total = Math.min(
-			maxS,
-			Math.max(minS, pacPerGram > 0 ? desired / pacPerGram : pref),
-		);
-		return { sucrose: total * share, highPac: total * (1 - share) };
-	}
 
 	const solveAt = (T: number): { sucrose: number; highPac: number } | null => {
 		if (T <= 0) return { sucrose: 0, highPac: 0 };
@@ -521,10 +513,14 @@ function sugarsBalanced(opts: {
 		const T = Math.min(maxS, Math.max(pref, (desired * mix) / (1000 * idx)));
 		return solveAt(T) ?? { sucrose: 0, highPac: T };
 	}
-	// Need less PAC than all sucrose at preferred → lower mass (floor min).
+	// Need less PAC than all sucrose at preferred → lower mass, keep preferred share.
 	if (pacAt(pref, 0) > desired) {
-		const T = Math.max(minS, Math.min(pref, (desired * mix) / 1000));
-		return solveAt(T) ?? { sucrose: T, highPac: 0 };
+		const pacPerGram = share + (1 - share) * idx;
+		const T = Math.max(
+			minS,
+			Math.min(pref, pacPerGram > 0 ? (desired * mix) / (1000 * pacPerGram) : pref),
+		);
+		return { sucrose: T * share, highPac: T * (1 - share) };
 	}
 	// Straddle: clamp share at preferred.
 	const s = Math.min(
@@ -605,8 +601,6 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 			: doseFor(saltDefaultKg, targetTotal);
 	const saltPac = pacPoints(salt, PAC_INDEX.salt, targetTotal);
 	const desiredSugarPac = Math.max(0, pacTarget - alcoholPac - saltPac);
-	// With alcohol: avoid high-PAC sugars (dextrose/invert/honey) — prefer sucrose.
-	const preferSucrose = alcohol > 0 && ALCOHOL_MIX_TWEAKS.preferSucrose;
 
 	const sugarRange =
 		params.liquid === "water" ? TARGETS.sugarsSorbet : TARGETS.sugarsCream;
@@ -625,13 +619,11 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		(targetTotal * sugarRange.max) / 100 - fruitSugarCut,
 	);
 
-	const highPacIndex = preferSucrose
-		? PAC_INDEX.sucrose
-		: mode.useHoney
-			? PAC_INDEX.honey
-			: mode.useInvert
-				? PAC_INDEX.invertedSugar
-				: PAC_INDEX.dextrose;
+	const highPacIndex = mode.useHoney
+		? PAC_INDEX.honey
+		: mode.useInvert
+			? PAC_INDEX.invertedSugar
+			: PAC_INDEX.dextrose;
 
 	// Sucrose-only: keep edible sugar %, do not scale up to freezer PAC (would be ~41% @ −18°C).
 	// Still cut if alcohol PAC would push the mix over the target.
@@ -650,19 +642,17 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 				minSugar,
 				maxSugar,
 				highPacIndex,
-				fixedShare: preferSucrose ? 1 : undefined,
+				preferredShare: params.sucroseShare,
 			});
 
 	const sucrose = scaled.sucrose;
 	const dextrose =
-		mode.useHoney || mode.useInvert || mode.sucroseOnly || preferSucrose
-			? 0
-			: scaled.highPac;
-	const invertSolids = mode.useInvert && !preferSucrose ? scaled.highPac : 0;
+		mode.useHoney || mode.useInvert || mode.sucroseOnly ? 0 : scaled.highPac;
+	const invertSolids = mode.useInvert ? scaled.highPac : 0;
 	const invertDiy = invertSolids > 0 ? invertDiyFromSolids(invertSolids) : null;
 	// Syrup weight into the mix (includes ~25% bound water).
 	const invertedSugar = invertDiy?.syrupGrams ?? 0;
-	const honey = mode.useHoney && !preferSucrose ? scaled.highPac : 0;
+	const honey = mode.useHoney ? scaled.highPac : 0;
 
 	const yogurt = targetTotal * params.yogurtFactor;
 	const rf = INGREDIENT_DATA.ricotta.formula;
@@ -1025,7 +1015,6 @@ export function generateRecipe(input: RecipeInput): RecipeResult {
 		ingredients.dextrose + ingredients.honey + (invertDiy?.solidsGrams ?? 0);
 	if (
 		!mode.sucroseOnly &&
-		!preferSucrose &&
 		sugarGrams > 0 &&
 		interferent / sugarGrams < 0.05
 	) {
@@ -1324,6 +1313,22 @@ export function __selfCheck() {
 	assert(
 		Math.abs(sorbet.pac.total - sorbet.pac.target) <= PAC_TOLERANCE,
 		`sorbet PAC within ±${PAC_TOLERANCE}: ${sorbet.pac.total} vs ${sorbet.pac.target}`,
+	);
+	const withAlcohol = generateRecipe({
+		kind: "cream",
+		totalGrams: 1000,
+		tempKey: "professional",
+		sugarMode: "blend",
+		alcoholGrams: 30,
+		alcoholAbv: 40,
+	});
+	assert(
+		withAlcohol.ingredients.dextrose > 0,
+		`alcohol keeps dextrose in blend got ${withAlcohol.ingredients.dextrose}`,
+	);
+	assert(
+		withAlcohol.ingredients.sucrose > 0,
+		`alcohol keeps sucrose got ${withAlcohol.ingredients.sucrose}`,
 	);
 	console.log("gelato-recipe-maker self-check ok");
 }

@@ -973,7 +973,7 @@ export default function App() {
 						servizio. Ogni aggiunta sposta latte o acqua nella ricetta; alcol e
 						limone alzano anche il neutro, il tuorlo lo riduce. Con limone e
 						latte aggiungi il succo a freddo; con alcol conviene un po' di
-						caseina (opzionale) e preferisci saccarosio tra gli zuccheri.
+						caseina (opzionale).
 					</p>
 
 					<div className="space-y-3">
@@ -1023,7 +1023,7 @@ export default function App() {
 										onChange={setAlcoholAbv}
 										min={1}
 										suffix="%"
-										hint={`Neutro alcol: ${INGREDIENT_DATA.neutro.formula.alcoholCreamGramsPerKg} g/kg crema/frutta · ×${1 + INGREDIENT_DATA.neutro.formula.alcoholSorbetBump} sorbetto · preferisci saccarosio`}
+										hint={`Neutro alcol: ${INGREDIENT_DATA.neutro.formula.alcoholCreamGramsPerKg} g/kg crema/frutta · ×${1 + INGREDIENT_DATA.neutro.formula.alcoholSorbetBump} sorbetto`}
 									/>
 								</div>
 								<label className="flex items-center gap-2 text-sm">
