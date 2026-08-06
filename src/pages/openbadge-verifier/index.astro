@@ -10,5 +10,9 @@ const title = "OpenBadge Verifier";
   description="Verify Open Badges locally in your browser."
 >
   <h1>{title}</h1>
-  <App client:load label="Coming soon" />
+  <p class="text-muted-foreground">
+    Reads the credential baked into an Open Badges 3.0 image and checks whether
+    it is still signed by the issuer it names.
+  </p>
+  <App client:load />
 </ToolLayout>
