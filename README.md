@@ -10,9 +10,9 @@ A collection of client-side tools for various uses. I made it for things i neede
 
 ### Open Badge 3.0 Verifier
 
-| Status          | URL                                                                 | Description                                                                   | Why                                                                 |
-| --------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Not yet started | [openbadge-verifier](https://tools.nicc-olo.com/openbadge-verifier) | A simple interface to validate Open Badges according to the new 3.0 standard. | Most tools use older 2.0 standard or are not implemented correctly. |
+| Status           | URL                                                                 | Description                                                                   | Why                                                                 |
+| ---------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Work in progress | [openbadge-verifier](https://tools.nicc-olo.com/openbadge-verifier) | A simple interface to validate Open Badges according to the new 3.0 standard. | Most tools use older 2.0 standard or are not implemented correctly. |
 
 ### Gelato Recipe Maker
 
